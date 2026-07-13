@@ -1,0 +1,7 @@
+﻿*.pem
+*.key
+.env
+*.log
+tmp/
+heretic_proxy.env
+heretic_last_setup.env
