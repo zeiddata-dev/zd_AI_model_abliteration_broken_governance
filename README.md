@@ -1,5 +1,8 @@
 # zd_abliteration_model
 
+![Runtime Detection and Audit Logging Architecture](docs/diagram-runtime-audit.svg)
+
+
 A private AI model with the "I can't help with that" surgically removed, running
 on a GPU so massive it trumps the cost of a mortgage if you leave it running. You
 turn it on when you need it, off when you don't, and it costs about the same as a
