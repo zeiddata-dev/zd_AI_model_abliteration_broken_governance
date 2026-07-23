@@ -1,7 +1,7 @@
 # zd_abliteration_model
 
 A private AI model with the "I can't help with that" surgically removed, running
-on a GPU you rent by the hour, that you talk to from a browser or an API. You
+on a GPU so massive it trumps the cost of a mortgage if you leave it running. You
 turn it on when you need it, off when you don't, and it costs about the same as a
 few coffees a month if you're disciplined about the off part.
 
