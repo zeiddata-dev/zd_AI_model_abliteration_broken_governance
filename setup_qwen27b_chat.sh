@@ -99,7 +99,7 @@ if ! command -v ollama >/dev/null 2>&1; then
   curl -fsSL https://ollama.com/install.sh | sh
 fi
 if command -v ollama >/dev/null 2>&1; then
-  OLLAMA="$(ollama --version 2>/dev/null | tail -n1)"
+  OLLAMA="$(ollama --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | tail -n1)"
   pass "Ollama installed: $OLLAMA"
 else
   fail "Ollama install failed."
