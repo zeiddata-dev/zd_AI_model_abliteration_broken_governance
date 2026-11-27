@@ -23,6 +23,7 @@ def clean(t: str) -> str:
     t = re.sub(r'`([^`]*)`', r'\1', t)
     t = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', t)
     t = re.sub(r'https?://\S+', 'a link', t)
+    t = re.sub(r'\[\d+(?:,\s*\d+)*\]', '', t)
     t = re.sub(r'[*_#>|~]+', ' ', t)
     return re.sub(r'\s+', ' ', t).strip()[:600]
 

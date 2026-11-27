@@ -2,6 +2,7 @@
 Runs inside the open-webui container (docker exec) so it can use Open WebUI's own
 account code. Listens on 127.0.0.1 only; Caddy sends /li-auth/* here.
 Nothing here stores a password: Open WebUI keeps those. Invite codes are stored hashed."""
+import logging; logging.getLogger('httpx').setLevel(logging.WARNING)
 import asyncio, base64, hashlib, json, os, secrets, sqlite3, sys, threading, time
 from datetime import timedelta
 
@@ -276,6 +277,95 @@ async def login_verify(req: Request):
         raise HTTPException(403, 'Your account is waiting for approval.')
     q('update passkeys set sign_count=?, last_used=? where id=?', (v.new_sign_count, now(), row['id']))
     return {'token': await mint(user.id), 'id': user.id, 'name': user.name, 'role': user.role}
+
+
+# ---------- web: private search (SearXNG on 127.0.0.1) and a page reader ----------
+import ipaddress, re as _re, socket
+from urllib.parse import urlparse, urljoin
+SEARX = os.environ.get('LI_SEARX', 'http://127.0.0.1:8888')
+UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36'
+web_http = httpx.AsyncClient(timeout=15, follow_redirects=False, headers={'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.8'})
+
+def public_url(u: str) -> str:
+    p = urlparse(u)
+    if p.scheme not in ('http', 'https') or not p.hostname:
+        raise HTTPException(400, 'Only web addresses (http or https) can be read.')
+    try:
+        infos = socket.getaddrinfo(p.hostname, p.port or (443 if p.scheme == 'https' else 80), proto=socket.IPPROTO_TCP)
+    except Exception:
+        raise HTTPException(400, "That site doesn't resolve.")
+    for i in infos:
+        ip = ipaddress.ip_address(i[4][0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            raise HTTPException(400, "Li doesn't read private or internal addresses.")
+    return u
+
+def page_text(html: str):
+    try:
+        from bs4 import BeautifulSoup
+        s = BeautifulSoup(html, 'html.parser')
+        for t in s(['script', 'style', 'noscript', 'svg', 'nav', 'footer', 'header', 'form', 'iframe']):
+            t.decompose()
+        title = (s.title.string or '').strip() if s.title and s.title.string else ''
+        main = s.find('article') or s.find('main') or s.body or s
+        text = main.get_text('\n')
+    except Exception:
+        title = (_re.search(r'<title[^>]*>(.*?)</title>', html, _re.S | _re.I) or [None, ''])[1].strip()
+        text = _re.sub(r'<(script|style)[\s\S]*?</\1>', ' ', html, flags=_re.I)
+        text = _re.sub(r'<[^>]+>', ' ', text)
+    text = _re.sub(r'[ \t\r\f\v]+', ' ', text)
+    text = _re.sub(r'\n\s*\n+', '\n\n', text).strip()
+    return title, text
+
+@app.post('/li-auth/web/search')
+async def web_search(req: Request):
+    await who(req); b = await req.json()
+    qy = str(b.get('q') or '').strip()[:300]
+    if not qy:
+        raise HTTPException(400, 'Nothing to search for.')
+    try:
+        r = await http.get(SEARX + '/search', params={'q': qy, 'format': 'json', 'safesearch': 0, 'language': 'en'})
+        j = r.json()
+    except Exception:
+        raise HTTPException(502, 'Web search is not answering right now.')
+    out, seen = [], set()
+    for x in j.get('results', []):
+        u = x.get('url') or ''
+        if not u.startswith('http') or u in seen:
+            continue
+        seen.add(u)
+        out.append({'title': (x.get('title') or '')[:200], 'url': u, 'snippet': (x.get('content') or '')[:400]})
+        if len(out) >= int(b.get('n') or 6):
+            break
+    return {'q': qy, 'results': out}
+
+@app.post('/li-auth/web/read')
+async def web_read(req: Request):
+    await who(req); b = await req.json()
+    u = str(b.get('url') or '').strip()
+    limit_chars = max(1000, min(20000, int(b.get('chars') or 6000)))
+    for _ in range(5):
+        public_url(u)
+        try:
+            r = await web_http.get(u)
+        except Exception:
+            raise HTTPException(502, "Couldn't reach that page.")
+        if r.is_redirect and r.headers.get('location'):
+            u = urljoin(u, r.headers['location']); continue
+        break
+    else:
+        raise HTTPException(502, 'Too many redirects.')
+    if r.status_code >= 400:
+        raise HTTPException(502, f'The page answered {r.status_code}.')
+    ct = r.headers.get('content-type', '')
+    body = r.content[:3_000_000]
+    if 'html' in ct or not ct:
+        title, text = page_text(body.decode(r.encoding or 'utf-8', errors='replace'))
+    elif ct.startswith('text/') or 'json' in ct:
+        title, text = '', body.decode(r.encoding or 'utf-8', errors='replace')
+    else:
+        raise HTTPException(415, 'Li reads web pages and text, not that kind of file.')
+    return {'url': str(r.url), 'title': title[:200], 'text': text[:limit_chars], 'chars': len(text)}
 
 # ---------- voice ----------
 @app.post('/li-auth/tts')
