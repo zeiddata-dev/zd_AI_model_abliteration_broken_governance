@@ -35,6 +35,9 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 /* top bar */
 .top{position:absolute;inset:0 0 auto 0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;padding:calc(10px + var(--safe-t)) 14px 22px;background:linear-gradient(var(--bg) 78%,rgba(246,244,239,0))}
 .top .r{display:flex;gap:8px}
+.ib.spk.on{background:var(--rust);border-color:var(--rust);color:#fff}
+.ib.spk.talking{animation:spkp 1.1s ease-in-out infinite}
+@keyframes spkp{50%{box-shadow:0 0 0 6px rgba(156,58,22,.18)}}
 .ib{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.04);color:var(--ink)}
 .mid{position:absolute;left:50%;transform:translateX(-50%);top:calc(10px + var(--safe-t));display:flex;flex-direction:column;align-items:center;gap:4px;max-width:54%}
 .title{border:0;background:none;font-size:15px;font-weight:500;color:var(--ink2);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 6px;border-radius:8px;opacity:0}
@@ -222,9 +225,24 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
 .pb{flex:1;position:relative;overflow:auto;background:#fff}
 .pb iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
 .pb pre{margin:0;padding:14px;font:13px/1.6 var(--mono);white-space:pre-wrap;color:#3d3a35}
+.dcolb{display:none}
+/* wide screens: Claude-style layout. Chats sidebar docked on the left (collapsible), chat in the middle,
+   preview panel docks on the right and pushes the chat over instead of covering it */
+@media (min-width:900px){
+  :root{--sbw:288px}
+  .shell{padding-left:var(--sbw);transition:padding .28s cubic-bezier(.3,.7,.2,1)}
+  .drawer{width:var(--sbw);transform:none;box-shadow:none;border-right:1px solid var(--line);z-index:6}
+  .scrim.d{display:none}
+  .dcolb{display:grid;margin-left:auto;border:0;background:none;box-shadow:none;width:36px;height:36px}
+  body:not(.dcol) #menu{visibility:hidden}
+  .dcol .drawer{transform:translateX(-102%)}
+  .dcol .shell{padding-left:0}
+  .top{padding-left:18px;padding-right:18px}
+}
 @media (min-width:980px){
-  .panel{inset:0 0 0 auto;width:46vw;transform:translateX(102%);border-left:1px solid var(--line)}
-  .popen .app{margin-right:46vw;margin-left:max(0px,calc((54vw - 760px)/2))}
+  :root{--pw:min(46vw,700px)}
+  .panel{inset:0 0 0 auto;width:var(--pw);transform:translateX(102%);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.05)}
+  .popen .shell{padding-right:var(--pw)}
 }
 
 /* talk mode */
@@ -277,6 +295,7 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
       <button class="pill" id="pill" aria-label="Where this chat runs"></button>
     </div>
     <div class="r">
+      <button class="ib spk" id="spk" aria-label="Read replies out loud" aria-pressed="true"></button>
       <button class="ib" id="newc" aria-label="New chat"></button>
       <button class="ib more" id="more" aria-label="Chat options"></button>
     </div>
@@ -313,7 +332,7 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
 
 <div class="scrim d" id="dscrim"></div>
 <nav class="drawer" id="drawer" aria-label="Chats">
-  <div class="dh"><span class="zm" aria-hidden="true"></span>Li</div>
+  <div class="dh"><span class="zm" aria-hidden="true"></span>Li<button class="ib dcolb" id="dcol" aria-label="Close sidebar"></button></div>
   <label class="search"><span id="sicon"></span><input id="find" type="search" placeholder="Search chats" autocomplete="off"></label>
   <div class="nav">
     <button class="new" id="dnew"></button>
@@ -382,14 +401,17 @@ const P = {
   lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', img:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
   file:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/>', gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
   check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', export:'<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/>', end:'<path d="M3.5 14.5c5-5 12-5 17 0l-2.5 2.5-3-1.5v-2.5a10 10 0 0 0-6 0V15.5l-3 1.5z"/>',
+  side:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
   mute:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
   face:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 15.5a3.5 3.5 0 0 0 5 0"/>',
   speak:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  hush:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
   people:'<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3 3 0 0 1 0 5.8M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/>', tag:'<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>'
 };
 const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
-[['menu','menu'],['newc','newc'],['more','more'],['plus','plus'],['mic','mic'],['jump','down'],['sicon','search'],['settings','gear'],['pclose','x'],['pcopy','copy'],['tend','end'],['tmute','mute']].forEach(([id,n]) => $(id).innerHTML = ic(n));
+[['menu','side'],['newc','newc'],['more','more'],['plus','plus'],['mic','mic'],['jump','down'],['sicon','search'],['settings','gear'],['pclose','x'],['pcopy','copy'],['tend','end'],['tmute','mute']].forEach(([id,n]) => $(id).innerHTML = ic(n));
 $('send').insertAdjacentHTML('afterbegin', ic('up'));
+const spkPaint = () => { const b = $('spk'); b.innerHTML = ic(S.voice.on ? 'speak' : 'hush'); b.classList.toggle('on', S.voice.on); b.setAttribute('aria-pressed', S.voice.on); b.setAttribute('aria-label', S.voice.on ? 'Li reads replies out loud. Tap to mute' : 'Li is muted. Tap to hear replies'); };
 $('dnew').innerHTML = ic('plus') + 'New chat';
 $('dmem').innerHTML = ic('brain') + 'Memory <span style="margin-left:auto;font-size:12px;color:var(--dim)">starter notes</span>';
 $('dcase').innerHTML = ic('case') + 'Case files';
@@ -398,11 +420,11 @@ $('tl').innerHTML = ic('lock') + 'Talk mode · Lithium Live voice';
 /* ---------- live state: chats, projects and settings live in this browser ---------- */
 let MEM = []; /* starter notes load from /li/notes.json on the box, never from this file */
 const KEY = 'li-live-v1';
-const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[], voice:{on:false, name:'af_heart'}});
+const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[], voice:{on:true, name:'af_heart', v:2}});
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
 if(!S || S.v !== 1) S = seed();
-if(!S.voice) S.voice = {on:false, name:'af_heart'};
+if(!S.voice || S.voice.v !== 2) S.voice = {on:true, name:(S.voice && S.voice.name) || 'af_heart', v:2};
 let ME = {name:'', first:'', id:'', role:''}, MODEL = '';
 const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S, (k,v) => (k==='url' || k==='data') ? undefined : v)); }catch(e){ toast('Storage is full, older chats may not save'); } };
 
@@ -513,8 +535,12 @@ function renderDrawer(){
 }
 
 /* ---------- drawer / sheets / panel ---------- */
-const openD = () => { document.body.classList.add('dopen'); renderDrawer(); };
-const closeD = () => document.body.classList.remove('dopen');
+const wide = () => matchMedia('(min-width:900px)').matches;
+const openD = () => { if(wide()){ document.body.classList.remove('dcol'); S.sideClosed = false; save(); } else document.body.classList.add('dopen'); renderDrawer(); };
+const closeD = () => document.body.classList.remove('dopen'); /* on wide screens the sidebar stays docked */
+if(S.sideClosed) document.body.classList.add('dcol');
+$('dcol').innerHTML = ic('side');
+$('dcol').onclick = () => { document.body.classList.add('dcol'); S.sideClosed = true; save(); };
 function sheet(html){ $('sheetIn').innerHTML = html; document.body.classList.add('sopen'); }
 const closeS = () => { if(!document.body.classList.contains('locked')) document.body.classList.remove('sopen'); };
 $('menu').onclick = openD; $('dscrim').onclick = closeD; $('sscrim').onclick = closeS;
@@ -852,15 +878,26 @@ const sayLocal = text => new Promise(res => {
   u.onend = u.onerror = () => res(); speechSynthesis.speak(u);
 });
 const voice = (() => {
-  let ctx = null, gen = 0, buf = '', chain = Promise.resolve(), pending = 0, src = null, doneRes = null, ended = false;
+  let gen = 0, buf = '', chain = Promise.resolve(), pending = 0, doneRes = null, ended = false, unlocked = false, playing = null;
+  /* one <audio> element, unlocked by a tap, then reused: iPhones play it even with the silent switch on */
+  const el = new Audio(); el.setAttribute('playsinline', ''); el.preload = 'auto';
+  const silent = (() => { const n = 2400, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([b], {type:'audio/wav'})); })();
   const spoken = t => t.replace(/```[\s\S]*?(```|$)/g, ' I put the code in the chat. ').replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, 'a link').replace(/[*_#>|~]+/g, ' ').replace(/\s+/g, ' ').trim();
-  const unlock = () => { try{ ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if(ctx.state === 'suspended') ctx.resume(); const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); }catch(e){} };
+  const unlock = () => {
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+    if(unlocked || playing) return;
+    try{ el.src = silent; const p = el.play(); unlocked = true; p && p.catch(() => { unlocked = false; }); }catch(e){}
+  };
   const fetchWav = text => api('/li-auth/tts', {method:'POST', body:JSON.stringify({text, voice:S.voice.name || 'af_heart'})}).then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('tts ' + r.status)));
   const play = ab => new Promise(res => {
-    try{
-      unlock();
-      ctx.decodeAudioData(ab, b => { src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.onended = () => { src = null; window.liTps = 0; res(); }; window.liTps = 18; src.start(0); }, () => res());
-    }catch(e){ res(); }
+    const url = URL.createObjectURL(new Blob([ab], {type:'audio/wav'}));
+    const done = ok => { if(playing !== url) return; playing = null; URL.revokeObjectURL(url); window.liTps = 0; $('spk') && $('spk').classList.remove('talking'); res(ok); };
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+    playing = url; el.onended = () => done(true); el.onerror = () => done(false); el.src = url;
+    const p = el.play(); window.liTps = 18; $('spk') && $('spk').classList.add('talking');
+    if(p) p.catch(() => done(false));
   });
   const settle = () => { if(ended && !pending && doneRes){ const r = doneRes; doneRes = null; r(); } };
   const say = text => {
@@ -870,7 +907,8 @@ const voice = (() => {
     chain = chain.then(async () => {
       if(g !== gen) return;
       const ab = await audio; if(g !== gen) return;
-      if(ab) await play(ab); else { window.liTps = 18; await sayLocal(t); window.liTps = 0; }
+      const ok = ab ? await play(ab) : false;
+      if(!ok && g === gen){ window.liTps = 18; await sayLocal(t); window.liTps = 0; }
     }).finally(() => { pending--; settle(); });
   };
   return {
@@ -887,12 +925,13 @@ const voice = (() => {
     },
     end(){ if(buf.trim()) say(buf); buf = ''; },
     finished(){ ended = true; return new Promise(r => { doneRes = r; settle(); }).finally(() => { ended = false; }); },
-    stop(){ gen++; buf = ''; try{ src && src.stop(); }catch(e){} src = null; if('speechSynthesis' in window) speechSynthesis.cancel(); window.liTps = 0; },
+    stop(){ gen++; buf = ''; try{ el.pause(); }catch(e){} if(playing){ URL.revokeObjectURL(playing); playing = null; } $('spk') && $('spk').classList.remove('talking'); if('speechSynthesis' in window) speechSynthesis.cancel(); window.liTps = 0; },
     get busy(){ return pending > 0; }
   };
 })();
 function listenOnce(){
   return new Promise(async (res, rej) => {
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'play-and-record'; }catch(e){}
     try{ stream = stream || await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ rej(new Error('mic')); return; }
     const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an);
     const buf = new Uint8Array(an.fftSize), chunks = []; let spoke = false, quietSince = 0; const t0 = performance.now();
@@ -943,6 +982,14 @@ $('mic').onclick = () => {
 };
 $('tend').onclick = () => { talkOn = false; try{ rec && rec.state === 'recording' && rec.stop(); }catch(e){} voice.stop(); ctl && ctl.abort(); if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } window.liTps = 0; document.body.classList.remove('talking'); };
 $('tmute').onclick = () => { muted = !muted; $('tmute').style.background = muted ? '#fff' : ''; $('tmute').style.color = muted ? '#120c09' : ''; };
+
+/* ---------- the speaker button up top: Li reads replies out loud ---------- */
+spkPaint();
+$('spk').onclick = () => {
+  S.voice.on = !S.voice.on; save(); spkPaint();
+  if(S.voice.on){ voice.stop(); voice.unlock(); voice.feed("I'll read my replies out loud."); voice.end(); toast('Li reads replies out loud'); }
+  else { voice.stop(); toast('Li is muted'); }
+};
 
 /* ---------- misc ---------- */
 function toEnd(soft){ if(soft && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 200) return; scroll.scrollTop = scroll.scrollHeight; }
@@ -1055,7 +1102,7 @@ async function faceSheet(){
 const VOICES = [['af_heart','Heart','warm, American'],['am_michael','Michael','calm, American'],['bf_emma','Emma','British'],['bm_george','George','British, deeper']];
 function voiceSheet(){
   sheet(`<div class="sh">${ic('speak')} Li's voice</div>
-    <button class="opt" data-s="voicetoggle">${ic('speak')}<span>Read replies out loud<small>Talk mode always speaks</small></span><span class="sw ${S.voice.on ? 'on' : ''}"></span></button>
+    <button class="opt" data-s="voicetoggle">${ic('speak')}<span>Read replies out loud<small>Same as the speaker button up top. Talk mode always speaks.</small></span><span class="sw ${S.voice.on ? 'on' : ''}"></span></button>
     <div class="note" style="margin-top:6px">Voice</div>
     <div class="vrow">${VOICES.map(v => `<button class="${S.voice.name === v[0] ? 'on' : ''}" data-s="voicepick" data-v="${v[0]}">${v[1]} <small style="color:var(--dim)">${v[2]}</small></button>`).join('')}</div>
     <div class="note">${ic('lock')} Spoken by Kokoro, an open voice model running on the box. Nothing goes to an outside service.</div>`);
@@ -1122,7 +1169,7 @@ $('sheetIn').addEventListener('click', async e => {
   else if(s === 'pkdel'){ try{ await j('/li-auth/passkeys/' + encodeURIComponent(b.dataset.id), {method:'DELETE'}); toast('Removed'); }catch(err){ toast(err.message); } faceSheet(); }
   else if(s === 'faceset') faceSheet();
   else if(s === 'voiceset') voiceSheet();
-  else if(s === 'voicetoggle'){ S.voice.on = !S.voice.on; save(); b.querySelector('.sw').classList.toggle('on', S.voice.on); if(S.voice.on){ voice.unlock(); voice.feed('Okay, I\'ll read my replies out loud.'); voice.end(); } else voice.stop(); }
+  else if(s === 'voicetoggle'){ S.voice.on = !S.voice.on; save(); spkPaint(); b.querySelector('.sw').classList.toggle('on', S.voice.on); if(S.voice.on){ voice.unlock(); voice.feed('Okay, I\'ll read my replies out loud.'); voice.end(); } else voice.stop(); }
   else if(s === 'voicepick'){ S.voice.name = b.dataset.v; save(); voice.stop(); voice.unlock(); voice.feed('Hi, this is how I sound.'); voice.end(); voiceSheet(); }
   else if(s === 'people') adminSheet('people');
   else if(s === 'atab') adminSheet(b.dataset.t);
