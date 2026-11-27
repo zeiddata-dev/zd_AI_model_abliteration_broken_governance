@@ -8,8 +8,10 @@
 # Li talks to the model through Open WebUI's /api/chat/completions with the signed-in user's token.
 # Rollback: the printed ROLLBACK line restores the previous Caddyfile.
 # Usage: bash setup_li_ui.sh [git ref]   (default: claude/qwen27b-openwebui)
+#        GATE=off bash setup_li_ui.sh [git ref]   no private link, login only, sign-ups closed
 
 REF=${1:-claude/qwen27b-openwebui}
+GATE=${GATE:-on}   # GATE=off drops the private-link gate (login only, sign-ups closed)
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 LOG=/tmp/li_ui_setup_${TS}.log
 PTR=/tmp/li_ui_last_setup.env
@@ -31,7 +33,7 @@ finish(){
   DECISION=$1
   {
     echo "LOG=$LOG"; echo "WWW=$WWW"; echo "BACKUP=$BACKUP"; echo "REF=$REF"
-    echo "PAGE=$PAGE"; echo "VENDOR=$VENDOR"; echo "FONTS=$FONTS"; echo "CADDY=$CADDY"; echo "ROUTES=$ROUTES"
+    echo "GATE=$GATE"; echo "PAGE=$PAGE"; echo "VENDOR=$VENDOR"; echo "FONTS=$FONTS"; echo "CADDY=$CADDY"; echo "ROUTES=$ROUTES"
     echo "ROLLBACK=sudo cp -a $BACKUP/Caddyfile.bak /etc/caddy/Caddyfile && sudo systemctl reload caddy"
     echo "DECISION=$DECISION"; echo "SETUP_UTC=$(date -u +%FT%TZ)"
   } > "$PTR"
@@ -93,6 +95,30 @@ sudo chown -R root:root "$WWW"; sudo find "$WWW" -type d -exec chmod 755 {} +; s
 
 # 5. Caddy: same gate, Li at / and /li/*, Open WebUI for everything else
 sudo cp -a /etc/caddy/Caddyfile "$BACKUP/Caddyfile.bak"
+if [ "$GATE" = "off" ]; then
+# No private-link gate: anyone reaching the domain gets Li's sign-in. New sign-ups are refused here,
+# so only accounts that already exist can get in.
+sudo tee /etc/caddy/Caddyfile >/dev/null <<CADDYEOF
+$DOMAIN {
+	encode zstd gzip
+	@signup path /api/v1/auths/signup
+	handle @signup {
+		respond "Sign-ups are closed" 403
+	}
+	@li path / /index.html /li/*
+	handle @li {
+		root * $WWW
+		header /index.html Cache-Control "no-cache"
+		header / Cache-Control "no-cache"
+		header /li/notes.json Cache-Control "no-store"
+		file_server
+	}
+	handle {
+		reverse_proxy 127.0.0.1:$WEBUI_PORT
+	}
+}
+CADDYEOF
+else
 sudo tee /etc/caddy/Caddyfile >/dev/null <<CADDYEOF
 $DOMAIN {
 	encode zstd gzip
@@ -120,6 +146,7 @@ $DOMAIN {
 	}
 }
 CADDYEOF
+fi
 sudo chmod 640 /etc/caddy/Caddyfile
 sudo chown root:caddy /etc/caddy/Caddyfile
 if sudo caddy validate --config /etc/caddy/Caddyfile >/dev/null 2>&1; then
@@ -137,16 +164,19 @@ if systemctl is-active --quiet caddy; then CADDY=OK; pass "Caddy reloaded"; else
 JAR=$(mktemp)
 c(){ curl -s -o /dev/null -w '%{http_code}' --max-time 15 "$@"; }
 STRANGER=$(c "https://$DOMAIN/")
-c -c "$JAR" "https://$DOMAIN/setup/$GATE_TOKEN" >/dev/null
+[ "$GATE" = "off" ] || c -c "$JAR" "https://$DOMAIN/setup/$GATE_TOKEN" >/dev/null
 ROOT=$(curl -s --max-time 15 -b "$JAR" "https://$DOMAIN/" | grep -c '<title>Li</title>')
 THREE=$(c -b "$JAR" "https://$DOMAIN/li/vendor/three.min.js")
 NOTES=$(c -b "$JAR" "https://$DOMAIN/li/notes.json")
 CFG=$(curl -s --max-time 15 -b "$JAR" "https://$DOMAIN/api/config" | grep -c '"version"')
 ADMIN=$(c -b "$JAR" "https://$DOMAIN/admin/users")
+SIGNUP=$(c -X POST -H 'Content-Type: application/json' -d '{}' "https://$DOMAIN/api/v1/auths/signup")
 rm -f "$JAR"
-echo "stranger=$STRANGER li_root=$ROOT three=$THREE notes=$NOTES api_config=$CFG admin=$ADMIN"
-if [ "$STRANGER" = "403" ] && [ "$ROOT" = "1" ] && [ "$NOTES" = "200" ] && [ "$CFG" = "1" ] && [ "$ADMIN" = "200" ]; then
-  ROUTES=OK; pass "Strangers 403, Li at /, Open WebUI API and admin still reachable"
+echo "gate=$GATE stranger=$STRANGER li_root=$ROOT three=$THREE notes=$NOTES api_config=$CFG admin=$ADMIN signup=$SIGNUP"
+if [ "$GATE" = "off" ]; then WANT_STRANGER=200; else WANT_STRANGER=403; fi
+if [ "$GATE" = "off" ] && [ "$SIGNUP" != "403" ]; then ROUTES="SIGNUP_OPEN_$SIGNUP"; warn "Sign-up is not blocked"; finish READY_CHECK 0; fi
+if [ "$STRANGER" = "$WANT_STRANGER" ] && [ "$ROOT" = "1" ] && [ "$NOTES" = "200" ] && [ "$CFG" = "1" ] && [ "$ADMIN" = "200" ]; then
+  ROUTES=OK; pass "Gate $GATE: front page $STRANGER, Li at /, Open WebUI API and admin reachable"
   finish READY 0
 else
   ROUTES="CHECK_${STRANGER}_${ROOT}_${THREE}_${NOTES}_${CFG}_${ADMIN}"; warn "A route check did not match"
