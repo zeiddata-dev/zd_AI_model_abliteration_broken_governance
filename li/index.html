@@ -155,18 +155,38 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;z-index:31;background:var(--card);border-radius:22px 22px 0 0;padding:8px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .26s cubic-bezier(.3,.7,.2,1);max-height:86dvh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.1)}
 .scrim.s{z-index:30}
 .sopen .sheet{transform:none}
-/* sign-in: a centered card over a soft blur, first thing a visitor sees */
+/* sign-in: the regular bottom sheet over a soft blur, can't be swiped away until you're in */
 .locked .scrim.s{background:rgba(246,244,239,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
-.locked .sheet{top:50%;bottom:auto;left:50%;right:auto;width:min(360px,calc(100vw - 36px));max-width:none;border-radius:24px;padding:26px 22px 22px;box-shadow:0 24px 60px rgba(29,28,26,.18),0 2px 8px rgba(29,28,26,.06);transform:translate(-50%,-46%);opacity:0;transition:transform .3s cubic-bezier(.3,.7,.2,1),opacity .25s}
-.locked.sopen .sheet{transform:translate(-50%,-50%);opacity:1}
-.locked .sheet .grab{display:none}
-.authhead{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:16px}
-.authhead .zm{width:64px;height:64px;margin-bottom:10px}
+.locked .sheet .grab{visibility:hidden}
+.authhead{display:flex;flex-direction:column;align-items:center;text-align:center;margin:2px 0 14px}
+.authhead .zm{width:54px;height:54px;margin-bottom:8px}
 .authhead h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
-.authhead p{margin:6px 0 0;color:var(--ink2);font-size:13.5px;display:flex;align-items:center;gap:6px}
-.authhead p svg{width:14px;height:14px}
+.blurb{font-size:13.5px;line-height:1.5;color:var(--ink2);margin:8px 4px 0;max-width:420px}
+.blurb b{font-weight:600;color:var(--ink)}
+.fid{width:100%;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:500}
+.fid svg.i{width:20px;height:20px}
+.or{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12.5px;margin:12px 2px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.alink{display:block;width:100%;border:0;background:none;color:var(--rust);font-size:14px;padding:12px 0 2px;text-align:center}
+.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin:0 0 12px}
+.seg button{flex:1;height:34px;border:0;border-radius:9px;background:none;font-size:14px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--soft2);display:grid;place-items:center;font-weight:600;font-size:14px;flex:none;color:var(--ink2)}
+.prow .who{flex:1;min-width:0}
+.prow .who b{font-weight:500;font-size:15px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .who small{color:var(--dim);font-size:12.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .pa{display:flex;gap:6px;flex:none}
+.badge{font-size:11.5px;border-radius:8px;padding:2px 7px;background:var(--soft);color:var(--ink2);white-space:nowrap}
+.badge.admin{background:#f6e7df;color:var(--rust)}.badge.pending,.badge.waiting{background:var(--amberbg);color:#6b4510}.badge.used{background:#e4efe7;color:var(--home)}
+.btn.mini{height:30px;border-radius:15px;font-size:13px;padding:0 11px}
+.linkbox{font:13px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;word-break:break-all;margin:4px 0 10px;user-select:all;-webkit-user-select:all}
+.bigcode{font:600 22px var(--mono);letter-spacing:.08em;text-align:center;margin:4px 0 10px}
+.vrow{display:flex;gap:8px;flex-wrap:wrap;margin:2px 4px 12px}
+.vrow button{height:34px;border-radius:17px;border:1px solid var(--line);background:var(--card);padding:0 12px;font-size:13.5px}
+.vrow button.on{border-color:var(--rust);color:var(--rust)}
 #authf .field{margin-bottom:10px}
-#authf .btn.dark{width:100%;height:46px;border-radius:23px;font-size:15px}
+#authf .btn.dark,.fid{width:100%;height:48px;border-radius:24px;font-size:15px}
 #authf .btns{margin-top:6px}
 .grab{width:38px;height:5px;border-radius:3px;background:var(--soft2);margin:0 auto 10px}
 .sh{font-size:17px;font-weight:600;margin:4px 4px 10px}
@@ -362,7 +382,10 @@ const P = {
   lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', img:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
   file:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/>', gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
   check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', export:'<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/>', end:'<path d="M3.5 14.5c5-5 12-5 17 0l-2.5 2.5-3-1.5v-2.5a10 10 0 0 0-6 0V15.5l-3 1.5z"/>',
-  mute:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>', tag:'<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>'
+  mute:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
+  face:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 15.5a3.5 3.5 0 0 0 5 0"/>',
+  speak:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  people:'<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3 3 0 0 1 0 5.8M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/>', tag:'<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>'
 };
 const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
 [['menu','menu'],['newc','newc'],['more','more'],['plus','plus'],['mic','mic'],['jump','down'],['sicon','search'],['settings','gear'],['pclose','x'],['pcopy','copy'],['tend','end'],['tmute','mute']].forEach(([id,n]) => $(id).innerHTML = ic(n));
@@ -375,11 +398,12 @@ $('tl').innerHTML = ic('lock') + 'Talk mode · Lithium Live voice';
 /* ---------- live state: chats, projects and settings live in this browser ---------- */
 let MEM = []; /* starter notes load from /li/notes.json on the box, never from this file */
 const KEY = 'li-live-v1';
-const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[]});
+const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[], voice:{on:false, name:'af_heart'}});
 let S;
 try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
 if(!S || S.v !== 1) S = seed();
-let ME = {name:'', first:''}, MODEL = '';
+if(!S.voice) S.voice = {on:false, name:'af_heart'};
+let ME = {name:'', first:'', id:'', role:''}, MODEL = '';
 const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S, (k,v) => (k==='url' || k==='data') ? undefined : v)); }catch(e){ toast('Storage is full, older chats may not save'); } };
 
 const app = $('app'), thread = $('thread'), scroll = $('scroll'), q = $('q'), send = $('send');
@@ -457,7 +481,7 @@ function msgHTML(c, msg, i){
   const where = msg.off ? `<span class="where"><span class="off">${ic('out')} Sent off-box</span></span>` : `<span class="where">${ic('house')} On your box${msg.tps ? ' · '+msg.tps.toFixed(1)+' tok/s' : ''}</span>`;
   const errBox = msg.err ? `<div class="warnbox" style="margin:6px 0 4px;display:flex;gap:10px;align-items:center;justify-content:space-between"><span>${esc(msg.err)}</span><button class="btn dark" data-act="retry" style="flex:none">Retry</button></div>` : '';
   return `<div class="a" data-i="${i}">${used ? `<button class="mem" data-act="mem">${ic('brain')}Used ${msg.mem.length} starter ${msg.mem.length > 1 ? 'notes' : 'note'}</button>${msg.showMem ? `<div class="memlist">${msg.mem.filter(k => MEM[k]).map(k => `<div>${ic('lock')} ${esc(MEM[k][0])}</div>`).join('')}</div>` : ''}` : ''}${blocks(parseMd(plain(msg)))}${errBox}${caseTags}
-    <div class="acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="good" class="${msg.rate === 1 ? 'on' : ''}" aria-label="Good reply">${ic('good')}</button><button data-act="bad" class="${msg.rate === -1 ? 'on' : ''}" aria-label="Bad reply">${ic('bad')}</button><button data-act="regen" aria-label="Regenerate">${ic('retry')}</button>${n > 1 ? `<span class="ver"><button data-act="vprev" aria-label="Previous version">${ic('l')}</button>${msg.vi+1}/${n}<button data-act="vnext" aria-label="Next version">${ic('r')}</button></span>` : ''}${where}<span class="zm mini" aria-hidden="true"></span></div></div>`;
+    <div class="acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="speak" aria-label="Read it out">${ic('speak')}</button><button data-act="good" class="${msg.rate === 1 ? 'on' : ''}" aria-label="Good reply">${ic('good')}</button><button data-act="bad" class="${msg.rate === -1 ? 'on' : ''}" aria-label="Bad reply">${ic('bad')}</button><button data-act="regen" aria-label="Regenerate">${ic('retry')}</button>${n > 1 ? `<span class="ver"><button data-act="vprev" aria-label="Previous version">${ic('l')}</button>${msg.vi+1}/${n}<button data-act="vnext" aria-label="Next version">${ic('r')}</button></span>` : ''}${where}<span class="zm mini" aria-hidden="true"></span></div></div>`;
 }
 function renderThread(keep){
   const c = chat();
@@ -578,7 +602,10 @@ function settingsSheet(){
   sheet(`<div class="sh">Settings</div>
     <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes<small>Read-only</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
     <button class="opt" data-s="memview">${ic('lock')}See the starter notes</button>
-    <a class="opt" href="/admin/users" style="text-decoration:none;color:inherit">${ic('gear')}<span>Admin<small>Accounts and models (Open WebUI)</small></span></a>
+    <button class="opt" data-s="voiceset">${ic('speak')}<span>Voice<small>${S.voice.on ? 'Reads replies out loud' : 'Off'} · ${(VOICES.find(v => v[0] === S.voice.name) || VOICES[0])[1]}</small></span></button>
+    <button class="opt" data-s="faceset">${ic('face')}<span>${APPLE ? 'Face ID' : 'Passkeys'}<small>Sign in without your password</small></span></button>
+    ${ME.role === 'admin' ? `<button class="opt" data-s="people">${ic('people')}<span>People and invites<small>Invite, approve, change roles, remove</small></span></button>
+    <a class="opt" href="/admin/users" style="text-decoration:none;color:inherit">${ic('gear')}<span>Advanced admin<small>Models and settings (Open WebUI)</small></span></a>` : ''}
     <button class="opt" data-s="signout">${ic('out')}Sign out</button>
     <button class="opt danger" data-s="wipe">${ic('x')}Delete all chats on this device</button>`);
 }
@@ -696,6 +723,7 @@ function sysPrompt(c){
   const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box. Nothing you see leaves this machine. Write like a sharp friend texting back: lead with the answer in the first sentence, keep it short (two to five sentences or a tight list) unless asked for depth, no headings, no sections explaining why you answered the way you did, no filler. Use a code block only for code. Never use em dashes.`];
   if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
   if(p){ if(p.instr) parts.push(`Project "${p.name}" instructions:\n${p.instr}`); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
+  if(talkOn) parts.push('This reply will be spoken out loud on a voice call. Talk like a person on the phone: one to three short, natural sentences, no lists, no markdown, no code unless asked. Sound warm and direct.');
   if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
   return parts.join('\n\n');
 }
@@ -739,6 +767,7 @@ async function respond(c, idx, alt){
     body.innerHTML = blocks(parseMd(vis)).replace(/<\/(p|li)>(<\/[uo]l>)?$/, '<span class="caret"></span></$1>$2');
     toEnd(true);
   };
+  const speakNow = talkOn || S.voice.on; if(speakNow){ voice.stop(); voice.unlock(); }
   ctl = new AbortController(); leftPage = document.hidden;
   const slow = setTimeout(() => { const l = think.querySelector('.lbl'); if(l && !toks) l.textContent = 'Waking up the 27B. After a break the first reply takes a couple of minutes.'; }, 8000);
   try{
@@ -757,7 +786,7 @@ async function respond(c, idx, alt){
         if(j.error){ err = (j.error.message || String(j.error)).slice(0, 160); continue; }
         const ch = j.choices && j.choices[0], dl = ch && ch.delta || {};
         if(dl.reasoning_content || dl.reasoning){ tick(); think.querySelector('.lbl') && (think.querySelector('.lbl').textContent = 'Li is thinking'); }
-        if(dl.content){ md += dl.content; tick(); show(); }
+        if(dl.content){ md += dl.content; tick(); show(); if(speakNow) voice.feed(dl.content); }
         const u = j.usage; if(u){ const v = u['response_token/s'] || (u.eval_count && u.eval_duration ? u.eval_count / (u.eval_duration / 1e9) : null); if(v) tps = +v; }
       }
     }
@@ -769,7 +798,7 @@ async function respond(c, idx, alt){
     else if(/failed to fetch|load failed|network|connection/i.test(e.message || '')) err = "Couldn't reach the box. Check your signal and tap retry.";
     else err = e.message || "Couldn't reach the box. Tap retry.";
   }
-  clearTimeout(slow); ctl = null; window.liTps = 0;
+  clearTimeout(slow); ctl = null; window.liTps = 0; if(speakNow){ if(err) voice.stop(); else voice.end(); }
   if(tps == null && toks > 4 && last > first) tps = (toks - 1) / ((last - first) / 1000);
   const msg = c.msgs[idx] || {r:'a', v:[], vi:0, ts:Date.now()};
   if(msg.err && msg.v.length && !String(msg.v[msg.v.length - 1].md || '').trim()) msg.v.pop(); /* a retry replaces the failed empty try */
@@ -781,8 +810,8 @@ async function respond(c, idx, alt){
   return err ? '' : plain(msg);
 }
 $('form').onsubmit = e => {
-  e.preventDefault();
-  if(busy){ ctl && ctl.abort(); return; }
+  e.preventDefault(); if(S.voice.on) voice.unlock();
+  if(busy){ ctl && ctl.abort(); voice.stop(); return; }
   const text = q.value.trim(); if(!text && !pending.length) return;
   let c = chat();
   if(!c){ c = {id:'c' + Date.now(), title:(text || pending[0].n).slice(0, 42), pinned:false, proj:S.curProj, model:S.nextModel, caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; S.nextModel = 'local'; }
@@ -797,6 +826,7 @@ thread.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b || busy) return;
   const c = chat(), node = b.closest('[data-i]'), i = +node.dataset.i, msg = c.msgs[i], act = b.dataset.act;
   if(act === 'copy') copy(plain(msg));
+  else if(act === 'speak'){ voice.stop(); voice.unlock(); voice.feed(plain(msg)); voice.end(); }
   else if(act === 'good' || act === 'bad'){ const v = act === 'good' ? 1 : -1; msg.rate = msg.rate === v ? 0 : v; renderThread(true); save(); }
   else if(act === 'regen') respond(c, i, true);
   else if(act === 'retry'){ msg.retryOnShow = false; respond(c, i, false); }
@@ -811,16 +841,56 @@ thread.addEventListener('click', e => {
 
 /* ---------- talk mode: you talk, the box's own Whisper writes it down, the 27B answers, your phone reads it out ---------- */
 let talkOn = false, muted = false, rec = null, stream = null;
-$('tl').innerHTML = ic('lock') + 'Talk mode · speech is transcribed on your box';
-const say = text => new Promise(res => {
+$('tl').innerHTML = ic('lock') + 'Talk mode · Li hears and speaks on your box';
+/* Li's voice: Kokoro on the box, one sentence at a time while the reply streams in.
+   Falls back to the phone's own voice if the box voice can't be reached. */
+const sayLocal = text => new Promise(res => {
   if(!('speechSynthesis' in window) || !text){ res(); return; }
-  const u = new SpeechSynthesisUtterance(text.replace(/```[\s\S]*?```/g, ' I put the code in the chat. ').replace(/[*_#`>|]/g, '').slice(0, 1500));
+  const u = new SpeechSynthesisUtterance(text);
   const v = speechSynthesis.getVoices().filter(x => x.localService && /^en/i.test(x.lang));
   if(v.length) u.voice = v.find(x => /samantha|daniel|alex|aaron|natural/i.test(x.name)) || v[0];
-  u.onstart = () => { $('tstate').textContent = 'Li'; window.liTps = 18; };
-  u.onend = u.onerror = () => { window.liTps = 0; res(); };
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
+  u.onend = u.onerror = () => res(); speechSynthesis.speak(u);
 });
+const voice = (() => {
+  let ctx = null, gen = 0, buf = '', chain = Promise.resolve(), pending = 0, src = null, doneRes = null, ended = false;
+  const spoken = t => t.replace(/```[\s\S]*?(```|$)/g, ' I put the code in the chat. ').replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, 'a link').replace(/[*_#>|~]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const unlock = () => { try{ ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if(ctx.state === 'suspended') ctx.resume(); const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); }catch(e){} };
+  const fetchWav = text => api('/li-auth/tts', {method:'POST', body:JSON.stringify({text, voice:S.voice.name || 'af_heart'})}).then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('tts ' + r.status)));
+  const play = ab => new Promise(res => {
+    try{
+      unlock();
+      ctx.decodeAudioData(ab, b => { src = ctx.createBufferSource(); src.buffer = b; src.connect(ctx.destination); src.onended = () => { src = null; window.liTps = 0; res(); }; window.liTps = 18; src.start(0); }, () => res());
+    }catch(e){ res(); }
+  });
+  const settle = () => { if(ended && !pending && doneRes){ const r = doneRes; doneRes = null; r(); } };
+  const say = text => {
+    const g = gen, t = spoken(text); if(!/[a-z0-9]/i.test(t)) return;
+    pending++;
+    const audio = fetchWav(t).catch(() => null); /* starts now, so the next sentence renders while this one plays */
+    chain = chain.then(async () => {
+      if(g !== gen) return;
+      const ab = await audio; if(g !== gen) return;
+      if(ab) await play(ab); else { window.liTps = 18; await sayLocal(t); window.liTps = 0; }
+    }).finally(() => { pending--; settle(); });
+  };
+  return {
+    unlock,
+    feed(delta){
+      buf += delta;
+      for(;;){
+        const code = buf.indexOf('```');
+        if(code >= 0){ const close = buf.indexOf('```', code + 3); if(close < 0){ if(code > 0){ say(buf.slice(0, code)); buf = buf.slice(code); } return; } say(buf.slice(0, code) + ' I put the code in the chat. '); buf = buf.slice(close + 3); continue; }
+        const m = buf.match(/^([\s\S]{8,}?[.!?:;](?=\s)|[\s\S]*?\n\n)/);
+        if(!m){ if(buf.length > 260){ const cut = buf.lastIndexOf(' ', 220); say(buf.slice(0, cut > 40 ? cut : 220)); buf = buf.slice(cut > 40 ? cut : 220); } return; }
+        say(m[0]); buf = buf.slice(m[0].length);
+      }
+    },
+    end(){ if(buf.trim()) say(buf); buf = ''; },
+    finished(){ ended = true; return new Promise(r => { doneRes = r; settle(); }).finally(() => { ended = false; }); },
+    stop(){ gen++; buf = ''; try{ src && src.stop(); }catch(e){} src = null; if('speechSynthesis' in window) speechSynthesis.cancel(); window.liTps = 0; },
+    get busy(){ return pending > 0; }
+  };
+})();
 function listenOnce(){
   return new Promise(async (res, rej) => {
     try{ stream = stream || await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ rej(new Error('mic')); return; }
@@ -859,18 +929,19 @@ async function talkLoop(){
     if(!c){ c = {id:'c' + Date.now(), title:text.slice(0, 42), pinned:false, proj:S.curProj, model:'local', caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; }
     c.msgs.push({r:'u', t:text, files:[], ts:Date.now()}); renderThread();
     $('tstate').textContent = 'Li is thinking';
+    if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } /* phones route sound to the earpiece while the mic is open */
     const reply = await respond(c, c.msgs.length, false);
     if(!talkOn) break;
     $('tcap').textContent = reply.replace(/```[\s\S]*?```/g, '[code in the chat]').replace(/[*_#`]/g, '').slice(0, 220);
-    await say(reply);
+    $('tstate').textContent = 'Li'; await voice.finished();
   }
   window.liTps = 0;
 }
 $('mic').onclick = () => {
   if(!navigator.mediaDevices || !window.MediaRecorder){ sheet(`<div class="sh">Talk mode</div><div class="note">This browser can't record audio. Try Safari or Chrome.</div>`); return; }
-  talkOn = true; muted = false; $('tcap').textContent = ''; document.body.classList.add('talking'); talkLoop();
+  voice.unlock(); talkOn = true; muted = false; $('tcap').textContent = ''; document.body.classList.add('talking'); talkLoop();
 };
-$('tend').onclick = () => { talkOn = false; try{ rec && rec.state === 'recording' && rec.stop(); }catch(e){} if('speechSynthesis' in window) speechSynthesis.cancel(); ctl && ctl.abort(); if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } window.liTps = 0; document.body.classList.remove('talking'); };
+$('tend').onclick = () => { talkOn = false; try{ rec && rec.state === 'recording' && rec.stop(); }catch(e){} voice.stop(); ctl && ctl.abort(); if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } window.liTps = 0; document.body.classList.remove('talking'); };
 $('tmute').onclick = () => { muted = !muted; $('tmute').style.background = muted ? '#fff' : ''; $('tmute').style.color = muted ? '#120c09' : ''; };
 
 /* ---------- misc ---------- */
@@ -882,38 +953,201 @@ const h = new Date().getHours();
 const greet = () => $('greet').textContent = (h < 5 ? 'Evening' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening') + (ME.first ? ', ' + ME.first : '');
 greet();
 
-/* ---------- sign in (Open WebUI accounts on this box) ---------- */
-function authSheet(first){
+/* ---------- sign in: invite-only accounts, password or Face ID (passkeys) ---------- */
+const BLURB = "Li runs on an <b>abliterated 27B model</b>: its built-in refusals have been stripped out, so it answers directly with no guardrails. It runs privately on Zeid Data's own server, and nothing you type leaves the box. <b>Invite only.</b>";
+const APPLE = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+const FID = APPLE ? 'Face ID' : 'a passkey';
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const ub64 = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while(s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer; };
+let canPK = false;
+const pkReady = (async () => { try{ canPK = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }catch(e){ canPK = false; } return canPK; })();
+const inviteFromUrl = () => { const m = location.search.match(/[?&]invite=([A-Za-z0-9-]+)/); return m ? m[1].toUpperCase() : ''; };
+async function j(path, opt){ const r = await api(path, opt); const x = await r.json().catch(() => ({})); if(!r.ok) throw new Error(typeof x.detail === 'string' ? x.detail : 'That didn\'t work (' + r.status + ').'); return x; }
+function signedIn(tok){ localStorage.token = tok; if(inviteFromUrl()) history.replaceState(null, '', location.pathname); document.body.classList.remove('locked'); closeS(); boot(true); }
+
+let loginOpts = null;
+async function prefetchLogin(){ try{ loginOpts = await j('/li-auth/passkey/login/options', {method:'POST', body:'{}'}); loginOpts.t = Date.now(); }catch(e){ loginOpts = null; } }
+async function faceLogin(){
+  const err = $('aerr'); err.textContent = '';
+  if(!loginOpts || Date.now() - loginOpts.t > 150000) await prefetchLogin();
+  if(!loginOpts){ err.textContent = 'Couldn\'t reach the box.'; return; }
+  const o = loginOpts.options, cid = loginOpts.challenge_id; loginOpts = null;
+  let cred;
+  try{
+    cred = await navigator.credentials.get({publicKey:{challenge:ub64(o.challenge), rpId:o.rpId, timeout:o.timeout, userVerification:'required', allowCredentials:[]}});
+  }catch(e){ err.textContent = e.name === 'NotAllowedError' ? '' : 'Face ID didn\'t work here. Use your password.'; prefetchLogin(); return; }
+  const r = cred.response;
+  try{
+    const x = await j('/li-auth/passkey/login/verify', {method:'POST', body:JSON.stringify({challenge_id:cid, credential:{id:cred.id, rawId:b64u(cred.rawId), type:cred.type,
+      response:{clientDataJSON:b64u(r.clientDataJSON), authenticatorData:b64u(r.authenticatorData), signature:b64u(r.signature), userHandle:r.userHandle ? b64u(r.userHandle) : null}, clientExtensionResults:{}}})});
+    signedIn(x.token);
+  }catch(e){ err.textContent = e.message; prefetchLogin(); }
+}
+
+function authSheet(mode){
+  if(mode === true) mode = 'first'; if(!mode) mode = inviteFromUrl() ? 'invite' : 'signin';
   document.body.classList.add('locked');
-  sheet(`<div class="authhead"><span class="zm spin" aria-hidden="true"></span><h2>${first ? 'Create your Li account' : 'Sign in to Li'}</h2>
-    <p>${ic('lock')} ${first ? 'First account on this box. It becomes the admin.' : 'Private. Runs on your own GPU.'}</p></div>
+  const head = `<div class="authhead"><span class="zm spin" aria-hidden="true"></span><h2>${mode === 'invite' ? 'You\'re invited to Li' : mode === 'pending' ? 'Almost there' : mode === 'first' ? 'Set up Li' : 'Li'}</h2>${mode === 'pending' ? '' : `<p class="blurb">${BLURB}</p>`}</div>`;
+  if(mode === 'pending'){
+    sheet(head + `<div class="warnbox">Your account is waiting for approval. The admin will let you in.</div><div class="btns"><button class="btn" data-s="signout" style="width:100%;height:44px">Sign out</button></div>`); return;
+  }
+  const inv = mode === 'invite', first = mode === 'first';
+  sheet(head + `
+    ${mode === 'signin' ? `<button class="btn dark fid" id="fidb" type="button" style="display:none">${ic('face')}Sign in with ${FID}</button><div class="or" id="fidor" style="display:none">or use your email</div>` : ''}
     <form id="authf">
-      ${first ? '<input class="field" id="an" autocomplete="name" placeholder="Name" required>' : ''}
+      ${inv ? `<input class="field" id="acode" autocomplete="one-time-code" autocapitalize="characters" placeholder="Invite code" value="${esc(inviteFromUrl())}" required>` : ''}
+      ${inv || first ? '<input class="field" id="an" autocomplete="name" placeholder="Your name" required>' : ''}
       <input class="field" id="ae" type="email" autocomplete="username" placeholder="Email" required>
-      <input class="field" id="ap" type="password" autocomplete="${first ? 'new-password' : 'current-password'}" placeholder="Password" required>
-      <div class="note" id="aerr" style="color:var(--rust)"></div>
-      <div class="btns"><button class="btn dark" type="submit">${first ? 'Create account' : 'Sign in'}</button></div>
-    </form>`);
+      <input class="field" id="ap" type="password" autocomplete="${inv || first ? 'new-password' : 'current-password'}" placeholder="${inv || first ? 'Make a password (8+ characters)' : 'Password'}" minlength="${inv || first ? 8 : 1}" required>
+      <div class="note" id="aerr" style="color:var(--rust)" aria-live="polite"></div>
+      <div class="btns"><button class="btn dark" type="submit">${inv ? 'Create my account' : first ? 'Create admin account' : 'Sign in'}</button></div>
+    </form>
+    ${first ? '' : `<button class="alink" data-s="${inv ? 'tosignin' : 'toinvite'}" type="button">${inv ? 'I already have an account' : 'I have an invite'}</button>`}`);
+  if(mode === 'signin') pkReady.then(ok => { if(ok && $('fidb')){ $('fidb').style.display = ''; $('fidor').style.display = ''; $('fidb').onclick = faceLogin; prefetchLogin(); } });
+  if(inv && inviteFromUrl()) j('/li-auth/invite/check', {method:'POST', body:JSON.stringify({code:inviteFromUrl()})}).then(x => { if(x.email && $('ae')){ $('ae').value = x.email; } }).catch(e => { $('aerr') && ($('aerr').textContent = e.message); });
   $('authf').onsubmit = async e => {
     e.preventDefault(); $('aerr').textContent = '';
-    const body = first ? {name:$('an').value.trim(), email:$('ae').value.trim(), password:$('ap').value} : {email:$('ae').value.trim(), password:$('ap').value};
+    const email = $('ae').value.trim(), password = $('ap').value;
+    const btn = $('authf').querySelector('[type=submit]'); btn.disabled = true;
     try{
-      const r = await fetch('/api/v1/auths/' + (first ? 'signup' : 'signin'), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-      const j = await r.json().catch(() => ({}));
-      if(!r.ok || !j.token){ $('aerr').textContent = j.detail ? String(j.detail).slice(0, 160) : (j.mfa_required || j.mfa ? 'This account uses 2FA. Sign in at /auth once, then come back.' : 'That didn\'t work (' + r.status + ').'); return; }
-      localStorage.token = j.token; document.body.classList.remove('locked'); closeS(); boot();
-    }catch(err){ $('aerr').textContent = 'Couldn\'t reach the box.'; }
+      if(inv){
+        const x = await j('/li-auth/invite/redeem', {method:'POST', body:JSON.stringify({code:$('acode').value.trim(), name:$('an').value.trim(), email, password})});
+        localStorage.token = x.token; S.offerFace = true; save(); signedIn(x.token); return;
+      }
+      const r = await fetch('/api/v1/auths/' + (first ? 'signup' : 'signin'), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(first ? {name:$('an').value.trim(), email, password} : {email, password})});
+      const x = await r.json().catch(() => ({}));
+      if(!r.ok || !x.token){ throw new Error(x.detail ? String(x.detail).slice(0, 160) : (x.mfa_required || x.mfa ? 'This account uses 2FA. Sign in at /auth once, then come back.' : 'That didn\'t work (' + r.status + ').')); }
+      S.offerFace = true; save(); signedIn(x.token);
+    }catch(err){ $('aerr').textContent = /fetch|load failed|network/i.test(err.message) ? 'Couldn\'t reach the box.' : err.message; btn.disabled = false; }
   };
 }
-async function signOut(){ try{ await api('/api/v1/auths/signout', {method:'POST'}); }catch(e){} delete localStorage.token; closeS(); authSheet(false); }
-async function boot(){
+
+/* Face ID setup: a passkey kept in the phone's keychain, unlocked by Face ID */
+let regOpts = null;
+async function faceOffer(){
+  if(!(await pkReady)) return;
+  let mine = []; try{ mine = await j('/li-auth/passkeys'); }catch(e){ return; }
+  if(mine.length) return;
+  try{ regOpts = await j('/li-auth/passkey/register/options', {method:'POST', body:'{}'}); }catch(e){ return; }
+  sheet(`<div class="sh">${ic('face')} Use ${FID} next time?</div><div class="note">Sign in with a glance instead of your password. The key stays in your phone's keychain. The box only keeps a public key.</div>
+    <div class="btns"><button class="btn" data-s="close">Not now</button><button class="btn dark" data-s="faceon">Turn on ${FID}</button></div>`);
+}
+async function faceRegister(){
+  try{
+    const o = regOpts || await j('/li-auth/passkey/register/options', {method:'POST', body:'{}'}); regOpts = null;
+    const cred = await navigator.credentials.create({publicKey:{challenge:ub64(o.challenge), rp:o.rp, user:{...o.user, id:ub64(o.user.id)}, pubKeyCredParams:o.pubKeyCredParams, timeout:o.timeout,
+      excludeCredentials:(o.excludeCredentials || []).map(c => ({...c, id:ub64(c.id)})), authenticatorSelection:o.authenticatorSelection, attestation:'none'}});
+    const r = cred.response;
+    await j('/li-auth/passkey/register/verify', {method:'POST', body:JSON.stringify({name:APPLE ? (/iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : 'Mac') : /Android/.test(navigator.userAgent) ? 'Android phone' : 'This device',
+      credential:{id:cred.id, rawId:b64u(cred.rawId), type:cred.type, response:{clientDataJSON:b64u(r.clientDataJSON), attestationObject:b64u(r.attestationObject), transports:r.getTransports ? r.getTransports() : []}, clientExtensionResults:{}}})});
+    toast(FID + ' is on for this account'); return true;
+  }catch(e){ if(e.name !== 'NotAllowedError') toast(e.name === 'InvalidStateError' ? 'This device already has a key' : (e.message || 'Couldn\'t turn it on')); return false; }
+}
+async function faceSheet(){
+  let mine = []; try{ mine = await j('/li-auth/passkeys'); }catch(e){ toast(e.message); return; }
+  sheet(`<div class="sh">${ic('face')} ${APPLE ? 'Face ID' : 'Passkeys'}</div>
+    <div class="note">${mine.length ? 'These devices can sign in to your account without a password.' : 'No devices yet. Turn it on and sign in with a glance next time.'}</div>
+    ${mine.map(p => `<div class="prow"><div class="av">${ic('face')}</div><div class="who"><b>${esc(p.name)}</b><small>Added ${new Date(p.created_at * 1000).toLocaleDateString()}${p.last_used ? ' · last used ' + new Date(p.last_used * 1000).toLocaleDateString() : ''}</small></div><div class="pa"><button class="btn mini" data-s="pkdel" data-id="${esc(p.id)}">Remove</button></div></div>`).join('')}
+    ${canPK ? `<div class="btns" style="margin-top:12px"><button class="btn dark" data-s="faceadd">Add this device</button></div>` : '<div class="note">This browser can\'t use passkeys.</div>'}`);
+}
+
+/* ---------- voice settings ---------- */
+const VOICES = [['af_heart','Heart','warm, American'],['am_michael','Michael','calm, American'],['bf_emma','Emma','British'],['bm_george','George','British, deeper']];
+function voiceSheet(){
+  sheet(`<div class="sh">${ic('speak')} Li's voice</div>
+    <button class="opt" data-s="voicetoggle">${ic('speak')}<span>Read replies out loud<small>Talk mode always speaks</small></span><span class="sw ${S.voice.on ? 'on' : ''}"></span></button>
+    <div class="note" style="margin-top:6px">Voice</div>
+    <div class="vrow">${VOICES.map(v => `<button class="${S.voice.name === v[0] ? 'on' : ''}" data-s="voicepick" data-v="${v[0]}">${v[1]} <small style="color:var(--dim)">${v[2]}</small></button>`).join('')}</div>
+    <div class="note">${ic('lock')} Spoken by Kokoro, an open voice model running on the box. Nothing goes to an outside service.</div>`);
+}
+
+/* ---------- admin: invites and people ---------- */
+let adminTab = 'people';
+async function adminSheet(tab){
+  adminTab = tab || adminTab;
+  const seg = `<div class="sh">${ic('people')} People</div><div class="seg"><button class="${adminTab === 'people' ? 'on' : ''}" data-s="atab" data-t="people">Accounts</button><button class="${adminTab === 'invites' ? 'on' : ''}" data-s="atab" data-t="invites">Invites</button></div>`;
+  sheet(seg + '<div class="note">Loading…</div>');
+  try{
+    if(adminTab === 'people'){
+      const x = await j('/api/v1/users/?page=1'); const us = x.users || x || [];
+      sheet(seg + us.map(u => { const me = u.id === ME.id; return `<div class="prow"><div class="av">${esc((u.name || u.email || '?')[0].toUpperCase())}</div>
+        <div class="who"><b>${esc(u.name || '(no name)')}${me ? ' <span class="badge">you</span>' : ''}</b><small>${esc(u.email || '')}</small></div>
+        <span class="badge ${esc(u.role)}">${esc(u.role)}</span>
+        ${me ? '' : `<div class="pa"><button class="btn mini" data-s="uman" data-id="${esc(u.id)}">Manage</button></div>`}</div>`; }).join('') + `<div class="btns" style="margin-top:12px"><button class="btn dark" data-s="atab" data-t="invites">Invite someone</button></div>`);
+      window.__users = us;
+    } else {
+      const xs = await j('/li-auth/invites');
+      sheet(seg + `<div class="btns" style="justify-content:flex-start;margin-bottom:8px"><button class="btn dark" data-s="invnew">New invite</button></div>` +
+        (xs.length ? xs.map(i => `<div class="prow"><div class="av">${ic('tag')}</div><div class="who"><b>${esc(i.label || 'Invite')}</b><small>${i.status === 'used' ? 'Joined as ' + esc(i.used_email || '') : i.email ? 'For ' + esc(i.email) : 'Anyone with the link'} · ${i.status === 'waiting' ? 'ends ' + new Date(i.expires_at * 1000).toLocaleDateString() : ''}</small></div>
+          <span class="badge ${esc(i.status)}">${esc(i.status)}</span>${i.status === 'waiting' ? `<div class="pa"><button class="btn mini" data-s="invdel" data-id="${esc(i.id)}">Cancel</button></div>` : ''}</div>`).join('') : '<div class="note">No invites yet. An invite is a one-time link. Only someone with it can make an account.</div>'));
+    }
+  }catch(e){ sheet(seg + `<div class="warnbox">${esc(e.message)}</div>`); }
+}
+function inviteForm(){
+  sheet(`<div class="sh">New invite</div><div class="note">Makes a one-time link. It works once, then it's used up.</div>
+    <input class="field" id="ilab" placeholder="Who is it for? (just a label)" maxlength="80">
+    <input class="field" id="iem" type="email" placeholder="Their email (optional, locks the invite to it)">
+    <div class="note">Link works for</div><div class="vrow">${[1,7,30].map(d => `<button class="${d === 7 ? 'on' : ''}" data-s="idays" data-d="${d}">${d} day${d > 1 ? 's' : ''}</button>`).join('')}</div>
+    <div class="note" id="ierr" style="color:var(--rust)"></div>
+    <div class="btns"><button class="btn" data-s="atab" data-t="invites">Back</button><button class="btn dark" data-s="invmake">Make invite</button></div>`);
+}
+function inviteMade(x){
+  sheet(`<div class="sh">Invite ready${x.label ? ' for ' + esc(x.label) : ''}</div>
+    <div class="note">Send them this link. It works once${x.email ? ', only for ' + esc(x.email) : ''}, until ${new Date(x.expires_at * 1000).toLocaleDateString()}. You won't see the code again after you close this.</div>
+    <div class="linkbox" id="ilink">${esc(x.link)}</div><div class="note" style="text-align:center">or the code</div><div class="bigcode">${esc(x.code)}</div>
+    <div class="btns"><button class="btn" data-s="atab" data-t="invites">Done</button>${navigator.share ? '<button class="btn" data-s="invshare">Share</button>' : ''}<button class="btn dark" data-s="invcopy">Copy link</button></div>`);
+  window.__inv = x;
+}
+function userSheet(id){
+  const u = (window.__users || []).find(x => x.id === id); if(!u) return;
+  sheet(`<div class="sh">${esc(u.name || u.email)}</div><div class="note">${esc(u.email)} · <span class="badge ${esc(u.role)}">${esc(u.role)}</span></div>
+    ${u.role === 'pending' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="user">${ic('check')}<span>Approve<small>Let them use Li</small></span></button>` : ''}
+    ${u.role !== 'admin' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="admin">${ic('people')}<span>Make admin<small>Can invite and manage people</small></span></button>` : `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="user">${ic('people')}<span>Make a regular user<small>Removes admin rights</small></span></button>`}
+    ${u.role === 'user' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="pending">${ic('lock')}<span>Pause access<small>They can't sign in until you approve them again</small></span></button>` : ''}
+    <button class="opt danger" data-s="udel" data-id="${esc(id)}">${ic('x')}<span>Remove account<small>Deletes the account and its chats on the box</small></span></button>
+    <div class="btns"><button class="btn" data-s="atab" data-t="people">Back</button></div>`);
+}
+async function setRole(id, role){
+  const u = (window.__users || []).find(x => x.id === id); if(!u) return;
+  try{ await j(`/api/v1/users/${id}/update`, {method:'POST', body:JSON.stringify({role, name:u.name, email:u.email, profile_image_url:u.profile_image_url || '/user.png'})}); toast(role === 'admin' ? 'Now an admin' : role === 'pending' ? 'Access paused' : 'Done'); adminSheet('people'); }
+  catch(e){ toast(e.message); }
+}
+let invDays = 7;
+$('sheetIn').addEventListener('click', async e => {
+  const b = e.target.closest('[data-s]'); if(!b) return; const s = b.dataset.s;
+  if(s === 'toinvite') authSheet('invite');
+  else if(s === 'tosignin'){ history.replaceState(null, '', location.pathname); authSheet('signin'); }
+  else if(s === 'faceon'){ b.disabled = true; await faceRegister(); closeS(); }
+  else if(s === 'faceadd'){ b.disabled = true; await faceRegister(); faceSheet(); }
+  else if(s === 'pkdel'){ try{ await j('/li-auth/passkeys/' + encodeURIComponent(b.dataset.id), {method:'DELETE'}); toast('Removed'); }catch(err){ toast(err.message); } faceSheet(); }
+  else if(s === 'faceset') faceSheet();
+  else if(s === 'voiceset') voiceSheet();
+  else if(s === 'voicetoggle'){ S.voice.on = !S.voice.on; save(); b.querySelector('.sw').classList.toggle('on', S.voice.on); if(S.voice.on){ voice.unlock(); voice.feed('Okay, I\'ll read my replies out loud.'); voice.end(); } else voice.stop(); }
+  else if(s === 'voicepick'){ S.voice.name = b.dataset.v; save(); voice.stop(); voice.unlock(); voice.feed('Hi, this is how I sound.'); voice.end(); voiceSheet(); }
+  else if(s === 'people') adminSheet('people');
+  else if(s === 'atab') adminSheet(b.dataset.t);
+  else if(s === 'invnew'){ invDays = 7; inviteForm(); }
+  else if(s === 'idays'){ invDays = +b.dataset.d; b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }
+  else if(s === 'invmake'){ b.disabled = true; try{ inviteMade(await j('/li-auth/invites', {method:'POST', body:JSON.stringify({label:$('ilab').value.trim(), email:$('iem').value.trim(), days:invDays})})); }catch(err){ $('ierr').textContent = err.message; b.disabled = false; } }
+  else if(s === 'invcopy') copy(window.__inv.link);
+  else if(s === 'invshare'){ try{ await navigator.share({title:'Your invite to Li', text:'Here\'s your invite to Li:', url:window.__inv.link}); }catch(err){} }
+  else if(s === 'invdel'){ try{ await j('/li-auth/invites/' + b.dataset.id, {method:'DELETE'}); toast('Invite cancelled'); }catch(err){ toast(err.message); } adminSheet('invites'); }
+  else if(s === 'uman') userSheet(b.dataset.id);
+  else if(s === 'urole') setRole(b.dataset.id, b.dataset.r);
+  else if(s === 'udel'){ const u = (window.__users || []).find(x => x.id === b.dataset.id); sheet(`<div class="sh">Remove ${esc(u ? u.name || u.email : 'this account')}?</div><div class="warnbox">Their account and everything it saved on the box are deleted. This can't be undone. Chats saved in their own browser stay there.</div><div class="btns"><button class="btn" data-s="uman" data-id="${esc(b.dataset.id)}">Keep</button><button class="btn warn" data-s="udodel" data-id="${esc(b.dataset.id)}">Remove for good</button></div>`); }
+  else if(s === 'udodel'){ try{ await j('/api/v1/users/' + b.dataset.id, {method:'DELETE'}); toast('Account removed'); }catch(err){ toast(err.message); } adminSheet('people'); }
+});
+
+async function signOut(){ voice.stop(); try{ await api('/api/v1/auths/signout', {method:'POST'}); }catch(e){} delete localStorage.token; closeS(); authSheet('signin'); }
+async function boot(fresh){
   try{
     const r = await api('/api/v1/auths/');
     if(!r.ok){
       const cfg = await fetch('/api/config', {credentials:'same-origin'}).then(x => x.json()).catch(() => ({}));
-      authSheet(!!cfg.onboarding); return;
+      authSheet(cfg.onboarding ? 'first' : null); return;
     }
-    const u = await r.json(); ME = {name:u.name || '', first:(u.name || '').split(' ')[0]};
+    const u = await r.json(); ME = {name:u.name || '', first:(u.name || '').split(' ')[0], id:u.id || '', role:u.role || ''};
+    if(ME.role === 'pending'){ authSheet('pending'); return; }
     $('meName').textContent = ME.name || 'You'; $('meAv').textContent = (ME.name || 'Y')[0].toUpperCase(); greet();
     try{ const n = await fetch('/li/notes.json', {credentials:'same-origin', cache:'no-store'}).then(x => x.json()); MEM = (n.notes || []).map(o => [o.text, o.kind || '']); }catch(e){ MEM = []; }
     const m = await api('/api/models').then(x => x.json()).catch(() => ({}));
@@ -921,6 +1155,7 @@ async function boot(){
     MODEL = ids.find(x => /qwen3\.8|abliterated/i.test(x)) || ids[0] || '';
     if(!MODEL) toast('No model found on the box');
     renderThread();
+    if(fresh && S.offerFace){ S.offerFace = false; save(); faceOffer(); }
   }catch(e){ toast('Couldn\'t reach the box'); }
 }
 renderThread(); updateSend(); boot();
