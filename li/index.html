@@ -431,7 +431,7 @@ function blocks(bs){
     : b.code ? `<div class="code"><div class="h"><span>${esc(b.code.title)}</span>${b.code.lang === 'html' ? `<button data-act="preview" data-b="${i}">${ic('eye')}Preview</button>` : ''}<button data-act="copycode" data-b="${i}">${ic('copy')}Copy</button></div><pre>${esc(b.code.src)}</pre></div>` : '').join('');
 }
 function fileChips(files, removable){
-  return (files||[]).map((f, i) => `<span class="fc">${f.url ? `<img src="${esc(f.url)}" alt="">` : `<span class="ft ${f.k}">${f.k === 'img' ? 'IMG' : f.k === 'pdf' ? 'PDF' : f.k === 'sheet' ? 'XLS' : 'FILE'}</span>`}<span><b>${esc(f.n)}</b><small>${kb(f.s)}</small></span>${removable ? `<button type="button" class="x" data-rm="${i}" aria-label="Remove ${esc(f.n)}">×</button>` : ''}</span>`).join('');
+  return (files||[]).map((f, i) => `<span class="fc">${f.url ? `<img src="${esc(f.url)}" alt="">` : `<span class="ft ${f.k}">${f.k === 'img' ? 'IMG' : f.k === 'pdf' ? 'PDF' : f.k === 'sheet' ? 'XLS' : 'FILE'}</span>`}<span><b>${esc(f.n)}</b><small>${f.busy ? 'Reading on your box…' : f.skip === 'unread' ? 'Couldn\'t read this one' : f.skip === 'too big' ? 'Too big to read' : kb(f.s)}</small></span>${removable ? `<button type="button" class="x" data-rm="${i}" aria-label="Remove ${esc(f.n)}">×</button>` : ''}</span>`).join('');
 }
 function exLabel(c, idx){ let n = 0; for(let i = 0; i <= idx; i++) n++; return 'E-' + String(n).padStart(3,'0'); }
 function msgHTML(c, msg, i){
@@ -613,7 +613,7 @@ $('more').onclick = () => { const c = chat(); if(c) chatMenu(c.id); };
 $('title').onclick = () => { const c = chat(); if(c) renameSheet(c.id); };
 $('pill').onclick = pillSheet;
 $('model').onclick = modelSheet;
-$('plus').onclick = () => sheet(`<div class="sh">Add to this message</div><button class="opt" data-s="img">${ic('img')}<span>Photos<small>Li looks at them on your box</small></span></button><button class="opt" data-s="file">${ic('file')}<span>Files<small>Text, code, CSV, Markdown. PDFs and Word come later</small></span></button>`);
+$('plus').onclick = () => sheet(`<div class="sh">Add to this message</div><button class="opt" data-s="img">${ic('img')}<span>Photos<small>Li looks at them on your box</small></span></button><button class="opt" data-s="file">${ic('file')}<span>Files<small>PDF, Word, text, CSV or code. Read on your box</small></span></button>`);
 
 /* panel */
 let pv = {src:'', text:''};
@@ -642,13 +642,29 @@ function addFiles(list){
     pending.push(e);
     if(k === 'img'){ if(f.size > 8e6){ e.skip = 'too big'; return; } const r = new FileReader(); r.onload = () => e.data = r.result; r.readAsDataURL(f); }
     else if(TEXTY.test(f.name)){ if(f.size > 2e5){ e.skip = 'too big'; return; } f.text().then(t => e.text = t); }
-    else e.skip = 'unread';
+    else { e.busy = true; boxExtract(f).then(t => { e.text = t; }, () => { e.skip = 'unread'; toast(`Couldn't read ${f.name}`); }).finally(() => { e.busy = false; renderAtt(); }); }
   });
   renderAtt();
 }
+/* the box's own document reader (Open WebUI file extraction), nothing leaves the box */
+async function boxExtract(f){
+  if(f.size > 25e6) throw new Error('too big');
+  const fd = new FormData(); fd.append('file', f, f.name);
+  const up = await fetch('/api/v1/files/?process=true&process_in_background=false', {method:'POST', credentials:'same-origin', headers:token() ? {Authorization:'Bearer ' + token()} : {}, body:fd});
+  if(!up.ok) throw new Error('upload ' + up.status);
+  const j = await up.json();
+  let t = '';
+  for(let k = 0; k < 20 && !t; k++){
+    const r = await api('/api/v1/files/' + j.id + '/data/content');
+    if(r.ok) t = ((await r.json()).content || '').trim();
+    if(!t) await wait(1500);
+  }
+  if(!t) throw new Error('empty');
+  return t.slice(0, 60000);
+}
 $('fimg').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
 $('ffile').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
-$('fproj').onchange = async e => { const p = proj(fileTarget); if(p){ for(const f of [...e.target.files]){ const x = {n:f.name, s:f.size, k:kind(f.name)}; if(TEXTY.test(f.name) && f.size <= 1e5) x.text = await f.text(); p.files.push(x); } save(); projSheet(p.id); } e.target.value = ''; };
+$('fproj').onchange = async e => { const p = proj(fileTarget); if(p){ toast('Reading on your box'); for(const f of [...e.target.files]){ const x = {n:f.name, s:f.size, k:kind(f.name)}; try{ x.text = TEXTY.test(f.name) ? (await f.text()).slice(0, 60000) : x.k === 'img' ? '' : await boxExtract(f); }catch(err){ toast(`Couldn't read ${f.name}`); } p.files.push(x); } save(); projSheet(p.id); } e.target.value = ''; };
 
 /* ---------- composer ---------- */
 function updateSend(){
@@ -671,7 +687,7 @@ function sysPrompt(c){
 }
 function userContent(x){
   let text = x.t || '';
-  (x.files || []).forEach(f => { if(f.text) text += `\n\nFile ${f.n}:\n\`\`\`\n${f.text}\n\`\`\``; else if(f.k !== 'img' || !f.data) text += `\n\n[Attached ${f.n}, which Li can't read yet]`; });
+  (x.files || []).forEach(f => { if(f.text) text += `\n\nFile ${f.n}:\n\`\`\`\n${f.text}\n\`\`\``; else if(f.k !== 'img' || !f.data) text += `\n\n[Attached ${f.n}, which couldn't be read]`; });
   const imgs = (x.files || []).filter(f => f.k === 'img' && f.data);
   return imgs.length ? [{type:'text', text}, ...imgs.map(f => ({type:'image_url', image_url:{url:f.data}}))] : text;
 }
@@ -701,6 +717,7 @@ async function respond(c, idx, alt){
     toEnd(true);
   };
   ctl = new AbortController();
+  const slow = setTimeout(() => { const l = think.querySelector('.lbl'); if(l && !toks) l.textContent = 'Waking up the 27B. After a break the first reply takes a couple of minutes.'; }, 8000);
   try{
     const r = await api('/api/chat/completions', {method:'POST', signal:ctl.signal, body:JSON.stringify({model:MODEL, stream:true, messages:msgs, ...(alt ? {temperature:0.9} : {})})});
     if(r.status === 401 || r.status === 403){ throw new Error('signin'); }
@@ -726,7 +743,7 @@ async function respond(c, idx, alt){
     else if(e.message === 'signin'){ err = 'Signed out'; authSheet(); }
     else err = e.message || 'Lost the connection to the box';
   }
-  ctl = null; window.liTps = 0;
+  clearTimeout(slow); ctl = null; window.liTps = 0;
   if(tps == null && toks > 4 && last > first) tps = (toks - 1) / ((last - first) / 1000);
   const msg = c.msgs[idx] || {r:'a', v:[], vi:0, ts:Date.now()};
   msg.v.push({md: md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim() || (err ? '' : '*No reply.*')}); msg.vi = msg.v.length - 1;
@@ -734,6 +751,7 @@ async function respond(c, idx, alt){
   c.msgs[idx] = msg; c.t = Date.now();
   busy = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
   renderThread(true); toEnd(); save();
+  return err ? '' : plain(msg);
 }
 $('form').onsubmit = e => {
   e.preventDefault();
@@ -741,7 +759,7 @@ $('form').onsubmit = e => {
   const text = q.value.trim(); if(!text && !pending.length) return;
   let c = chat();
   if(!c){ c = {id:'c' + Date.now(), title:(text || pending[0].n).slice(0, 42), pinned:false, proj:S.curProj, model:S.nextModel, caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; S.nextModel = 'local'; }
-  if(pending.some(f => !f.skip && !f.text && !f.data)){ toast('Still reading your file, one sec'); return; }
+  if(pending.some(f => f.busy || (!f.skip && !f.text && !f.data))){ toast('Still reading your file, one sec'); return; }
   c.msgs.push({r:'u', t:text || 'Here are the files.', files:pending.map(({n,s,k,url,text,data}) => ({n,s,k,url,text,data})), ts:Date.now()});
   pending = []; renderAtt(); q.value = ''; q.style.height = 'auto';
   renderThread(); respond(c, c.msgs.length, false);
@@ -763,9 +781,69 @@ thread.addEventListener('click', e => {
   else if(act === 'copycode'){ copy(parseMd(plain(msg))[+b.dataset.b].code.src); }
 });
 
-/* ---------- talk mode waits for Lithium Live ---------- */
-$('mic').onclick = () => sheet(`<div class="sh">Talk mode</div><div class="note">${ic('lock')} Voice runs through Lithium Live, which isn't connected to Li yet. When it is, this button opens the voice screen. Typing works now.</div><div class="btns"><button class="btn dark" data-s="close">Got it</button></div>`);
-$('tend').onclick = () => document.body.classList.remove('talking');
+/* ---------- talk mode: you talk, the box's own Whisper writes it down, the 27B answers, your phone reads it out ---------- */
+let talkOn = false, muted = false, rec = null, stream = null;
+$('tl').innerHTML = ic('lock') + 'Talk mode · speech is transcribed on your box';
+const say = text => new Promise(res => {
+  if(!('speechSynthesis' in window) || !text){ res(); return; }
+  const u = new SpeechSynthesisUtterance(text.replace(/```[\s\S]*?```/g, ' I put the code in the chat. ').replace(/[*_#`>|]/g, '').slice(0, 1500));
+  const v = speechSynthesis.getVoices().filter(x => x.localService && /^en/i.test(x.lang));
+  if(v.length) u.voice = v.find(x => /samantha|daniel|alex|aaron|natural/i.test(x.name)) || v[0];
+  u.onstart = () => { $('tstate').textContent = 'Li'; window.liTps = 18; };
+  u.onend = u.onerror = () => { window.liTps = 0; res(); };
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+});
+function listenOnce(){
+  return new Promise(async (res, rej) => {
+    try{ stream = stream || await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ rej(new Error('mic')); return; }
+    const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    const buf = new Uint8Array(an.fftSize), chunks = []; let spoke = false, quietSince = 0; const t0 = performance.now();
+    rec = new MediaRecorder(stream); rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => { ac.close(); res(spoke ? new Blob(chunks, {type: rec.mimeType || 'audio/webm'}) : null); };
+    rec.start(250);
+    const loop = () => {
+      if(!rec || rec.state !== 'recording') return;
+      an.getByteTimeDomainData(buf); let sum = 0; for(const v of buf){ const d = (v - 128) / 128; sum += d * d; }
+      const rms = Math.sqrt(sum / buf.length), now = performance.now();
+      if(rms > 0.035){ spoke = true; quietSince = 0; } else if(spoke && !quietSince) quietSince = now;
+      if((spoke && quietSince && now - quietSince > 1300) || now - t0 > 30000 || !talkOn || muted) rec.stop(); else requestAnimationFrame(loop);
+    };
+    loop();
+  });
+}
+async function talkLoop(){
+  while(talkOn){
+    if(muted){ $('tstate').textContent = 'Muted'; $('wave').style.visibility = 'hidden'; await wait(400); continue; }
+    $('tstate').textContent = 'Listening'; $('wave').style.visibility = 'visible'; window.liTps = 0;
+    let blob; try{ blob = await listenOnce(); }catch(e){ $('tstate').textContent = 'Mic blocked'; $('tcap').textContent = 'Allow the microphone for this site, then try again.'; talkOn = false; break; }
+    if(!talkOn) break; if(!blob) continue;
+    $('tstate').textContent = 'Writing it down'; $('wave').style.visibility = 'hidden';
+    let text = '';
+    try{
+      const fd = new FormData(); fd.append('file', blob, 'talk.' + (/mp4/.test(blob.type) ? 'm4a' : /ogg/.test(blob.type) ? 'ogg' : 'webm'));
+      const r = await fetch('/api/v1/audio/transcriptions', {method:'POST', credentials:'same-origin', headers:token() ? {Authorization:'Bearer ' + token()} : {}, body:fd});
+      if(r.ok) text = ((await r.json()).text || '').trim();
+    }catch(e){}
+    if(!talkOn) break;
+    if(!/[a-z0-9]/i.test(text)){ $('tcap').textContent = "Didn't catch that."; continue; }
+    $('tcap').textContent = '“' + text + '”';
+    let c = chat();
+    if(!c){ c = {id:'c' + Date.now(), title:text.slice(0, 42), pinned:false, proj:S.curProj, model:'local', caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; }
+    c.msgs.push({r:'u', t:text, files:[], ts:Date.now()}); renderThread();
+    $('tstate').textContent = 'Li is thinking';
+    const reply = await respond(c, c.msgs.length, false);
+    if(!talkOn) break;
+    $('tcap').textContent = reply.replace(/```[\s\S]*?```/g, '[code in the chat]').replace(/[*_#`]/g, '').slice(0, 220);
+    await say(reply);
+  }
+  window.liTps = 0;
+}
+$('mic').onclick = () => {
+  if(!navigator.mediaDevices || !window.MediaRecorder){ sheet(`<div class="sh">Talk mode</div><div class="note">This browser can't record audio. Try Safari or Chrome.</div>`); return; }
+  talkOn = true; muted = false; $('tcap').textContent = ''; document.body.classList.add('talking'); talkLoop();
+};
+$('tend').onclick = () => { talkOn = false; try{ rec && rec.state === 'recording' && rec.stop(); }catch(e){} if('speechSynthesis' in window) speechSynthesis.cancel(); ctl && ctl.abort(); if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } window.liTps = 0; document.body.classList.remove('talking'); };
+$('tmute').onclick = () => { muted = !muted; $('tmute').style.background = muted ? '#fff' : ''; $('tmute').style.color = muted ? '#120c09' : ''; };
 
 /* ---------- misc ---------- */
 function toEnd(soft){ if(soft && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 200) return; scroll.scrollTop = scroll.scrollHeight; }
