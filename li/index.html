@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#f6f4ef">
+<title>Li</title>
+<link rel="icon" id="fav" href="data:,">
+<link href="/li/vendor/fonts.css" rel="stylesheet">
+<style>
+/*
+VOICE  calm, private, a little playful; a phone app first
+IDEA   Claude-style mobile chat that lives on your own GPU box
+PICTURE the rust 3D Zeid Z: idle on home, spins with live tok/s
+COLOUR warm paper #f6f4ef, ink #262522, rust accent, amber only for off-box
+TYPE   Source Serif 4 for Li's words, system sans for UI, JetBrains Mono for code
+*/
+:root{
+  --bg:#f6f4ef; --card:#fbfaf7; --soft:#eeebe4; --soft2:#e7e3da; --line:#e4e0d7; --ink:#262522; --ink2:#5d5a54; --dim:#9a968e;
+  --pink:#D76233; --rust:#9c3a16; --black:#1d1c1a; --home:#3f6b4f; --amber:#b7791f; --amberbg:#fbefd9;
+  --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;
+  --serif:"Source Serif 4",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+body{overflow:hidden}
+button,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.shell{display:flex;height:100dvh}
+.app{flex:1;display:flex;flex-direction:column;position:relative;max-width:760px;margin:0 auto;width:100%}
+
+/* top bar */
+.top{position:absolute;inset:0 0 auto 0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;padding:calc(10px + var(--safe-t)) 14px 22px;background:linear-gradient(var(--bg) 78%,rgba(246,244,239,0))}
+.top .r{display:flex;gap:8px}
+.ib{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.04);color:var(--ink)}
+.mid{position:absolute;left:50%;transform:translateX(-50%);top:calc(10px + var(--safe-t));display:flex;flex-direction:column;align-items:center;gap:4px;max-width:54%}
+.title{border:0;background:none;font-size:15px;font-weight:500;color:var(--ink2);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 6px;border-radius:8px;opacity:0}
+.convo .title{opacity:1}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;font-size:12px;font-weight:500;border:0;background:#e5eee7;color:var(--home)}
+.pill svg.i{width:13px;height:13px}
+.pill.off{background:var(--amberbg);color:var(--amber)}
+.pill .case{display:none}
+.casemode .pill .case{display:inline;margin-left:4px;padding-left:6px;border-left:1px solid currentColor;opacity:.8}
+.more{display:none}.convo .more{display:grid}
+
+/* scroll */
+.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:96px 18px 24px;scrollbar-width:none}
+.home{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:30px}
+.greet{font-family:var(--serif);font-size:30px;font-weight:400;letter-spacing:-.01em;margin:18px 0 0}
+.sub{font-size:14px;color:var(--dim);margin-top:8px}
+.projtag{margin-top:14px;font-size:13px;color:var(--ink2);background:var(--soft);border-radius:10px;padding:6px 10px;display:none}
+.inproj .projtag{display:inline-block}
+.convo .home{display:none}
+.thread{display:none}.convo .thread{display:block}
+
+/* messages */
+.u{display:flex;flex-direction:column;align-items:flex-end;margin:18px 0}
+.u .b{max-width:84%;background:var(--soft);border-radius:20px;padding:10px 15px;font-size:16px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+.u .uacts{display:flex;gap:2px;margin-top:2px;opacity:.85}
+.u .edit{width:100%;max-width:84%;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px}
+.u .edit textarea{width:100%;border:0;background:none;resize:none;outline:none;font-size:16px;line-height:1.45;min-height:60px}
+.u .edit .row{justify-content:flex-end}
+.btn{height:36px;border-radius:18px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:14px;font-weight:500}
+.btn.dark{background:var(--black);border-color:var(--black);color:#fff}
+.btn.warn{background:var(--amber);border-color:var(--amber);color:#fff}
+.files{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:6px;max-width:84%}
+.fc{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 6px 6px;font-size:13px;max-width:220px}
+.fc img{width:34px;height:34px;object-fit:cover;border-radius:8px}
+.fc .ft{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:600;color:#fff;background:var(--ink2);flex:none}
+.fc .ft.pdf{background:#b3271a}.fc .ft.sheet{background:#2f7a4a}.fc .ft.img{background:#5b6e8c}
+.fc b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc small{color:var(--dim)}
+.fc .x{border:0;background:none;color:var(--dim);padding:0 2px;font-size:16px}
+
+.a{margin:18px 0 22px;font-family:var(--serif);font-size:17.5px;line-height:1.6}
+.a p{margin:0 0 12px}.a ul{margin:0 0 12px;padding-left:22px}.a li{margin:0 0 8px}.a b{font-weight:600}
+.mem{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12.5px;color:var(--ink2);background:var(--soft);border:0;border-radius:12px;padding:4px 10px;margin-bottom:8px}
+.mem svg.i{width:13px;height:13px}
+.memlist{font-family:var(--sans);font-size:13px;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:-2px 0 10px}
+.memlist div{padding:3px 0}
+.code{font-family:var(--sans);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:4px 0 14px;background:var(--card)}
+.code .h{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;font-size:12.5px;color:var(--ink2);border-bottom:1px solid var(--line)}
+.code .h span{margin-right:auto;font-family:var(--mono)}
+.code .h button{height:30px;border:0;border-radius:8px;background:none;padding:0 9px;font-size:12.5px;display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.code .h button:active{background:var(--soft)}
+.code pre{margin:0;padding:12px;font:12.5px/1.55 var(--mono);overflow-x:auto;color:#3d3a35;max-height:220px}
+.acts{display:flex;align-items:center;gap:2px;margin-top:4px;font-family:var(--sans);color:var(--dim)}
+.acts button{min-width:32px;height:32px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--dim)}
+.acts button:active{background:var(--soft)}
+.acts button.on{color:var(--rust)}
+.ver{display:inline-flex;align-items:center;font-size:12.5px;gap:0}
+.ver button{min-width:26px}
+.where{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+.where .off{color:var(--amber);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;font-family:var(--sans)}
+.tag{font-size:11.5px;color:var(--rust);background:#f6e7df;border-radius:8px;padding:2px 7px;white-space:nowrap}
+.tag.ex{color:var(--ink2);background:var(--soft);font-family:var(--mono)}
+.u .tags{justify-content:flex-end;max-width:84%}
+.think{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--ink2);font-size:15px}
+.think .lbl{background:linear-gradient(90deg,var(--dim),var(--ink),var(--dim));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 1.6s linear infinite}
+.tps{font:12px var(--mono);color:var(--dim)}
+.caret::after{content:"";display:inline-block;width:8px;height:16px;margin-left:2px;vertical-align:-2px;background:var(--pink);border-radius:2px;animation:blink 1s steps(1) infinite}
+.jump{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(140px + var(--safe-b));z-index:4;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:none;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.jump.on{display:grid}
+
+/* composer */
+.dock{padding:6px 12px calc(12px + var(--safe-b));background:linear-gradient(rgba(246,244,239,0),var(--bg) 30%)}
+.comp{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:10px 12px 10px;box-shadow:0 4px 18px rgba(40,30,20,.07)}
+.comp .files{justify-content:flex-start;max-width:100%;margin:0 0 6px}
+.comp textarea{display:block;width:100%;border:0;background:none;resize:none;outline:none;font-size:16px;line-height:1.4;padding:6px 6px 10px;max-height:160px}
+.comp textarea::placeholder{color:var(--dim)}
+.row{display:flex;align-items:center;gap:8px}
+.round{width:38px;height:38px;border-radius:50%;border:0;background:var(--soft);display:grid;place-items:center;flex:none}
+.chip{height:38px;border:0;border-radius:19px;background:var(--soft);padding:0 12px;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.chip i{font-style:normal;color:var(--dim)}
+.chip.off i{color:var(--amber);font-weight:500}
+.send{margin-left:auto;width:38px;height:38px;border-radius:50%;border:0;background:var(--black);color:#fff;display:grid;place-items:center;flex:none}
+.send svg.i{stroke-width:2.2}
+.send .stop{display:none;width:12px;height:12px;background:#fff;border-radius:2px}
+.busy .send .stop{display:block}.busy .send svg{display:none}
+.mic{margin-left:auto}
+.hasText .mic,.busy .mic{display:none}
+.send.hide{display:none}
+.fine{text-align:center;font-size:11.5px;color:var(--dim);margin-top:8px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(20,18,15,.3);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.dopen .scrim.d,.sopen .scrim.s{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(86vw,340px);background:#f1eee8;z-index:21;transform:translateX(-102%);transition:transform .28s cubic-bezier(.3,.7,.2,1);display:flex;flex-direction:column;padding:calc(12px + var(--safe-t)) 10px calc(12px + var(--safe-b));box-shadow:8px 0 30px rgba(0,0,0,.08)}
+.dopen .drawer{transform:none}
+.dh{display:flex;align-items:center;gap:10px;padding:4px 8px 12px;font-family:var(--serif);font-size:24px}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0 12px;color:var(--dim);margin-bottom:6px}
+.search input{border:0;background:none;outline:none;height:42px;width:100%;font-size:16px;color:var(--ink)}
+.nav button,.list button.it{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;padding:10px 10px;border-radius:12px;font-size:15.5px;text-align:left}
+.nav .new{color:#a3401a;font-weight:500}
+.nav button:active,.list .it:active{background:var(--soft)}
+.lab{font-size:12.5px;color:var(--dim);padding:12px 10px 4px;display:flex;align-items:center;justify-content:space-between}
+.lab button{border:0;background:none;color:var(--ink2);font-size:12.5px}
+.dscroll{flex:1;overflow-y:auto;scrollbar-width:none}
+.list .r{display:flex;align-items:center;border-radius:12px}
+.list .r.cur{background:var(--soft)}
+.list .it{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .it .t{overflow:hidden;text-overflow:ellipsis}
+.list .it svg.i{width:15px;height:15px;color:var(--dim)}
+.list .dots{width:36px;height:36px;border:0;background:none;color:var(--dim);border-radius:10px;flex:none;display:grid;place-items:center}
+.empty{padding:6px 10px;color:var(--dim);font-size:14px}
+.me{display:flex;align-items:center;gap:10px;padding:12px 8px 0;border-top:1px solid var(--line)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--black);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:600}
+.me b{font-weight:500;font-size:15px}.me small{display:block;color:var(--dim);font-size:12.5px}
+
+/* bottom sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;z-index:31;background:var(--card);border-radius:22px 22px 0 0;padding:8px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .26s cubic-bezier(.3,.7,.2,1);max-height:86dvh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.1)}
+.scrim.s{z-index:30}
+.sopen .sheet{transform:none}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--soft2);margin:0 auto 10px}
+.sh{font-size:17px;font-weight:600;margin:4px 4px 10px}
+.sbody{overflow-y:auto;scrollbar-width:none}
+.opt{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;padding:13px 6px;border-radius:12px;font-size:16px;text-align:left}
+.opt:active{background:var(--soft)}
+.opt small{display:block;color:var(--dim);font-size:13px;margin-top:1px}
+.opt .ck{margin-left:auto;color:var(--rust)}
+.opt.danger{color:#b3271a}
+.sw{margin-left:auto;width:44px;height:26px;border-radius:13px;background:var(--soft2);position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .2s}
+.sw.on{background:var(--rust)}.sw.on::after{transform:translateX(18px)}
+.field{display:block;width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;font-size:16px;outline:none;margin:4px 0 12px}
+textarea.field{resize:vertical;min-height:96px;line-height:1.45}
+.note{font-size:13px;color:var(--dim);margin:0 4px 12px;line-height:1.45}
+.warnbox{background:var(--amberbg);color:#6b4510;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;margin-bottom:14px}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.memitem{display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px}
+.memitem svg.i{color:var(--dim);width:15px;height:15px;margin-top:3px}
+.memitem small{display:block;color:var(--dim);font-size:12.5px}
+.sheet .ex{display:block;width:100%;text-align:left;border:0;background:none;border-bottom:1px solid var(--line);padding:10px 4px;font-size:14px}
+.sheet .ex b{font-family:var(--mono);font-weight:400;color:var(--rust);margin-right:6px}
+.sheet .ex .q{color:var(--ink2);display:block;margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* side panel: preview + case packet */
+.panel{position:fixed;z-index:25;background:var(--card);display:flex;flex-direction:column;inset:0;transform:translateY(102%);transition:transform .28s cubic-bezier(.3,.7,.2,1)}
+.popen .panel{transform:none}
+.ph{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--safe-t)) 12px 10px;border-bottom:1px solid var(--line)}
+.ph b{font-weight:600;font-size:15px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:flex;background:var(--soft);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;border-radius:8px;height:30px;padding:0 12px;font-size:13.5px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pb{flex:1;position:relative;overflow:auto;background:#fff}
+.pb iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+.pb pre{margin:0;padding:14px;font:13px/1.6 var(--mono);white-space:pre-wrap;color:#3d3a35}
+@media (min-width:980px){
+  .panel{inset:0 0 0 auto;width:46vw;transform:translateX(102%);border-left:1px solid var(--line)}
+  .popen .app{margin-right:46vw;margin-left:max(0px,calc((54vw - 760px)/2))}
+}
+
+/* talk mode */
+.talk{position:fixed;inset:0;z-index:40;background:radial-gradient(120% 80% at 50% 40%,#2a1a12,#120c09 70%);color:#f4ece6;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(18px + var(--safe-t)) 20px calc(26px + var(--safe-b))}
+.talking .talk{display:flex}
+.talk .tl{font-size:13px;color:#c9b8ad;display:flex;align-items:center;gap:6px}
+.talk .zm.talkz{width:190px;height:190px}
+.talk .state{font-family:var(--serif);font-size:26px;margin-top:22px;text-align:center}
+.talk .cap{min-height:52px;max-width:340px;text-align:center;color:#d9c9bf;font-size:16px;line-height:1.45;margin-top:10px}
+.wave{display:flex;gap:4px;height:28px;align-items:center;margin-top:16px}
+.wave i{width:4px;border-radius:2px;background:#e0874a;height:6px;animation:wv 1s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.4s}.wave i:nth-child(6){animation-delay:.5s}.wave i:nth-child(7){animation-delay:.6s}
+.talk .tb{display:flex;gap:14px}
+.talk .tb button{width:58px;height:58px;border-radius:50%;border:0;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff}
+.talk .tb .end{background:#c8402a}
+.talk .tb svg.i{width:22px;height:22px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(150px + var(--safe-b));transform:translate(-50%,20px);background:var(--black);color:#fff;font-size:14px;padding:10px 14px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:88vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Zeid mark */
+.zm{display:inline-grid;place-items:center;width:28px;height:28px;flex:none;position:relative}
+.zm>*{width:100%;height:100%;display:block}
+.zm svg{overflow:visible;filter:drop-shadow(0 1px 1px rgba(60,20,5,.35))}
+.zm.big{width:132px;height:132px}
+.zm.mini{width:22px;height:22px}
+.dh .zm{width:30px;height:30px}
+.think .zm.mini{width:26px;height:26px}
+.zm.spin svg{animation:yspin 1.4s linear infinite,rustcycle 2.8s linear infinite}
+.zm.idle svg{animation:sway 6s ease-in-out infinite}
+@keyframes yspin{to{transform:rotateY(360deg)}}
+@keyframes sway{50%{transform:rotateY(22deg)}}
+@keyframes rustcycle{50%{filter:hue-rotate(14deg) brightness(1.15)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes shine{to{background-position:-200% 0}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+@keyframes wv{50%{height:26px}}
+.u,.a{animation:rise .25s ease-out}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="app" id="app">
+  <header class="top">
+    <button class="ib" id="menu" aria-label="Open menu"></button>
+    <div class="mid">
+      <button class="title" id="title" aria-label="Rename chat">New chat</button>
+      <button class="pill" id="pill" aria-label="Where this chat runs"></button>
+    </div>
+    <div class="r">
+      <button class="ib" id="newc" aria-label="New chat"></button>
+      <button class="ib more" id="more" aria-label="Chat options"></button>
+    </div>
+  </header>
+
+  <main class="scroll" id="scroll">
+    <section class="home">
+      <div class="zm big idle" role="img" aria-label="Zeid Data logo"></div>
+      <h1 class="greet" id="greet">Hello</h1>
+      <div class="sub">Li · running on your own GPU</div>
+      <div class="projtag" id="projtag"></div>
+    </section>
+    <section class="thread" id="thread" aria-live="polite"></section>
+  </main>
+
+  <button class="jump" id="jump" aria-label="Jump to latest"></button>
+
+  <footer class="dock">
+    <form class="comp" id="form">
+      <div class="files" id="att"></div>
+      <label for="q" style="position:absolute;left:-9999px">Message Li</label>
+      <textarea id="q" rows="1" placeholder="Talk to Li" autocomplete="off"></textarea>
+      <div class="row">
+        <button type="button" class="round" id="plus" aria-label="Add photos or files"></button>
+        <button type="button" class="chip" id="model">Li 27B <i>local</i></button>
+        <button type="button" class="round mic" id="mic" aria-label="Talk mode"></button>
+        <button type="submit" class="send hide" id="send" aria-label="Send"><span class="stop"></span></button>
+      </div>
+    </form>
+    <div class="fine">Li runs on your own GPU. Chats are saved in this browser.</div>
+  </footer>
+</div>
+</div>
+
+<div class="scrim d" id="dscrim"></div>
+<nav class="drawer" id="drawer" aria-label="Chats">
+  <div class="dh"><span class="zm" aria-hidden="true"></span>Li</div>
+  <label class="search"><span id="sicon"></span><input id="find" type="search" placeholder="Search chats" autocomplete="off"></label>
+  <div class="nav">
+    <button class="new" id="dnew"></button>
+    <button id="dmem"></button>
+    <button id="dcase"></button>
+  </div>
+  <div class="dscroll">
+    <div class="lab">Projects <button id="newproj">+ New</button></div>
+    <div class="list" id="projs"></div>
+    <div class="lab" id="pinlab">Pinned</div>
+    <div class="list" id="pins"></div>
+    <div class="lab">Recents</div>
+    <div class="list" id="rec"></div>
+  </div>
+  <div class="me"><div class="av" id="meAv">L</div><div><b id="meName">Signing in</b><small>Your box · L4 GPU</small></div>
+    <button class="ib" id="settings" style="margin-left:auto;border:0;background:none;box-shadow:none" aria-label="Settings"></button>
+  </div>
+</nav>
+
+<div class="scrim s" id="sscrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sbody" id="sheetIn"></div></div>
+
+<aside class="panel" id="panel" aria-label="Preview">
+  <div class="ph"><b id="ptitle">Preview</b>
+    <div class="seg" id="pseg"><button data-v="preview" class="on">Preview</button><button data-v="code">Code</button></div>
+    <button class="ib" id="pcopy" aria-label="Copy"></button>
+    <button class="ib" id="pclose" aria-label="Close panel"></button>
+  </div>
+  <div class="pb" id="pbody"></div>
+</aside>
+
+<div class="talk" id="talk" role="dialog" aria-label="Talk mode">
+  <div class="tl" id="tl"></div>
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="zm talkz spin" aria-hidden="true"></div>
+    <div class="state" id="tstate">Listening</div>
+    <div class="wave" id="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cap" id="tcap"></div>
+  </div>
+  <div class="tb"><button id="tmute" aria-label="Mute"></button><button class="end" id="tend" aria-label="End talk mode"></button></div>
+</div>
+
+<input type="file" id="fimg" accept="image/*" multiple hidden>
+<input type="file" id="ffile" accept=".pdf,.csv,.xlsx,.xls,.txt,.md,.docx,.json" multiple hidden>
+<input type="file" id="fproj" multiple hidden>
+<div class="toast" id="toast" role="status"></div>
+<script>
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P = {
+  menu:'<path d="M4 8h16M4 15h10"/>', newc:'<path d="M12 20c4.6 0 8-3.3 8-7.6S16.6 5 12 5 4 8.1 4 12.4c0 1.6.5 3 1.3 4.2L4.5 20l3.7-1c1.1.6 2.4 1 3.8 1Z"/><path d="M12 9.5v6M9 12.5h6"/>',
+  more:'<circle cx="6" cy="12" r=".7"/><circle cx="12" cy="12" r=".7"/><circle cx="18" cy="12" r=".7"/>',
+  house:'<path d="M4 11.5 12 5l8 6.5V20h-5v-5h-6v5H4z"/>', out:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+  up:'<path d="M12 19V5M6 11l6-6 6 6"/>', down:'<path d="M12 5v14M6 13l6 6 6-6"/>', search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  folder:'<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  brain:'<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3ZM9.5 21h5"/>',
+  case:'<rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>',
+  good:'<path d="M7 11v9H4v-9h3Zm0 0 4-7c1.7 0 2.6 1.2 2.2 2.8L12.6 10H18a2 2 0 0 1 2 2.3l-1.1 6A2 2 0 0 1 16.9 20H7"/>',
+  bad:'<path d="M7 13V4H4v9h3Zm0 0 4 7c1.7 0 2.6-1.2 2.2-2.8L12.6 14H18a2 2 0 0 0 2-2.3l-1.1-6A2 2 0 0 0 16.9 4H7"/>',
+  retry:'<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/>', edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  l:'<path d="m14 6-6 6 6 6"/>', r:'<path d="m10 6 6 6-6 6"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', pin:'<path d="M9 4h6l-1 5 3 3H7l3-3zM12 15v5"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', img:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
+  file:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/>', gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', export:'<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/>', end:'<path d="M3.5 14.5c5-5 12-5 17 0l-2.5 2.5-3-1.5v-2.5a10 10 0 0 0-6 0V15.5l-3 1.5z"/>',
+  mute:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>', tag:'<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>'
+};
+const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+[['menu','menu'],['newc','newc'],['more','more'],['plus','plus'],['mic','mic'],['jump','down'],['sicon','search'],['settings','gear'],['pclose','x'],['pcopy','copy'],['tend','end'],['tmute','mute']].forEach(([id,n]) => $(id).innerHTML = ic(n));
+$('send').insertAdjacentHTML('afterbegin', ic('up'));
+$('dnew').innerHTML = ic('plus') + 'New chat';
+$('dmem').innerHTML = ic('brain') + 'Memory <span style="margin-left:auto;font-size:12px;color:var(--dim)">starter notes</span>';
+$('dcase').innerHTML = ic('case') + 'Case files';
+$('tl').innerHTML = ic('lock') + 'Talk mode · Lithium Live voice';
+
+/* ---------- live state: chats, projects and settings live in this browser ---------- */
+let MEM = []; /* starter notes load from /li/notes.json on the box, never from this file */
+const KEY = 'li-live-v1';
+const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[]});
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
+if(!S || S.v !== 1) S = seed();
+let ME = {name:'', first:''}, MODEL = '';
+const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S, (k,v) => (k==='url' || k==='data') ? undefined : v)); }catch(e){ toast('Storage is full, older chats may not save'); } };
+
+const app = $('app'), thread = $('thread'), scroll = $('scroll'), q = $('q'), send = $('send');
+const chat = () => S.chats.find(c => c.id === S.cur);
+const proj = id => S.projects.find(p => p.id === id);
+const kb = s => s > 1e6 ? (s/1e6).toFixed(1)+' MB' : Math.max(1, Math.round(s/1e3))+' KB';
+const kind = n => /\.(png|jpe?g|gif|webp|heic)$/i.test(n) ? 'img' : /\.pdf$/i.test(n) ? 'pdf' : /\.(csv|xlsx?|numbers)$/i.test(n) ? 'sheet' : 'doc';
+const hm = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+const day = ts => new Date(ts).toLocaleDateString([], {month:'short', day:'numeric'});
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 2200); }
+const copy = t => navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Copied'), () => toast("Couldn't copy here"));
+
+/* ---------- case file auto-tagger ---------- */
+const MONTHS = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+function tagsFor(text, files){
+  const t = text || '', out = [];
+  (t.match(new RegExp('\\b('+MONTHS+')[a-z]*\\.? \\d{1,2}\\b','g')) || []).forEach(d => out.push(d.replace(/^(\w{3})\w*\.?/, '$1')));
+  (t.match(/\$\d[\d,]*(\.\d+)?/g) || []).forEach(a => out.push(a));
+  [['email','email'],['receipt','receipt'],['invoice','invoice'],['photo','photos'],['lease','lease'],['deposit','deposit'],['call','call'],['contract','contract']].forEach(([k,v]) => { if(new RegExp(k,'i').test(t)) out.push(v); });
+  (files||[]).forEach(f => out.push(f.k === 'pdf' ? 'document' : f.k === 'img' ? 'photos' : 'attachment'));
+  return [...new Set(out)].slice(0, 6);
+}
+const plain = msg => msg.r === 'u' ? msg.t : String((msg.v[msg.vi] || {}).md || '');
+
+/* ---------- markdown (escaped first, then a small safe subset) ---------- */
+function inl(t){
+  let x = esc(t);
+  x = x.replace(/`([^`]+)`/g, '<code>$1</code>');
+  x = x.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+  x = x.replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return x;
+}
+function parseMd(md){
+  const out = [], lines = String(md || '').replace(/\r/g, '').split('\n');
+  let i = 0, para = [];
+  const flush = () => { if(para.length){ out.push({p: inl(para.join(' '))}); para = []; } };
+  while(i < lines.length){
+    const l = lines[i];
+    const f = l.match(/^\s*```\s*([\w.+-]*)\s*$/);
+    if(f){
+      flush(); const lang = (f[1] || '').toLowerCase(), buf = []; i++;
+      while(i < lines.length && !/^\s*```\s*$/.test(lines[i])) buf.push(lines[i++]);
+      i++; const src = buf.join('\n');
+      const html = lang === 'html' || /^\s*<!doctype html|^\s*<html/i.test(src);
+      out.push({code:{lang: html ? 'html' : lang, title: html ? 'page.html' : (lang || 'code'), src}}); continue;
+    }
+    if(/^\s*$/.test(l)){ flush(); i++; continue; }
+    const h = l.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ flush(); out.push({h: inl(h[2])}); i++; continue; }
+    if(/^\s*([-*+]|\d+[.)])\s+/.test(l)){
+      flush(); const ordered = /^\s*\d/.test(l), items = [];
+      while(i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])){ items.push(inl(lines[i].replace(/^\s*([-*+]|\d+[.)])\s+/, ''))); i++; }
+      out.push(ordered ? {ol:items} : {ul:items}); continue;
+    }
+    para.push(l); i++;
+  }
+  flush(); return out;
+}
+/* ---------- rendering ---------- */
+function blocks(bs){
+  return bs.map((b, i) => b.p != null ? `<p>${b.p}</p>` : b.h != null ? `<p><b>${b.h}</b></p>` : b.ol ? `<ol>${b.ol.map(x => `<li>${x}</li>`).join('')}</ol>` : b.ul ? `<ul>${b.ul.map(x => `<li>${x}</li>`).join('')}</ul>`
+    : b.code ? `<div class="code"><div class="h"><span>${esc(b.code.title)}</span>${b.code.lang === 'html' ? `<button data-act="preview" data-b="${i}">${ic('eye')}Preview</button>` : ''}<button data-act="copycode" data-b="${i}">${ic('copy')}Copy</button></div><pre>${esc(b.code.src)}</pre></div>` : '').join('');
+}
+function fileChips(files, removable){
+  return (files||[]).map((f, i) => `<span class="fc">${f.url ? `<img src="${esc(f.url)}" alt="">` : `<span class="ft ${f.k}">${f.k === 'img' ? 'IMG' : f.k === 'pdf' ? 'PDF' : f.k === 'sheet' ? 'XLS' : 'FILE'}</span>`}<span><b>${esc(f.n)}</b><small>${kb(f.s)}</small></span>${removable ? `<button type="button" class="x" data-rm="${i}" aria-label="Remove ${esc(f.n)}">×</button>` : ''}</span>`).join('');
+}
+function exLabel(c, idx){ let n = 0; for(let i = 0; i <= idx; i++) n++; return 'E-' + String(n).padStart(3,'0'); }
+function msgHTML(c, msg, i){
+  const caseTags = c.caseMode ? `<div class="tags"><span class="tag ex">${exLabel(c, i)}</span>${tagsFor(plain(msg), msg.files).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
+  if(msg.r === 'u'){
+    if(msg.editing) return `<div class="u" data-i="${i}"><div class="edit"><textarea data-edit>${esc(msg.t)}</textarea><div class="row btns"><button class="btn" data-act="canceledit">Cancel</button><button class="btn dark" data-act="saveedit">Save and resend</button></div></div></div>`;
+    return `<div class="u" data-i="${i}">${msg.files && msg.files.length ? `<div class="files">${fileChips(msg.files)}</div>` : ''}<div class="b">${esc(msg.t)}</div>${caseTags}<div class="uacts acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="edit" aria-label="Edit">${ic('edit')}</button></div></div>`;
+  }
+  const n = msg.v.length, used = false;
+  const where = msg.off ? `<span class="where"><span class="off">${ic('out')} Sent off-box</span></span>` : `<span class="where">${ic('house')} On your box${msg.tps ? ' · '+msg.tps.toFixed(1)+' tok/s' : ''}${msg.err ? ' · <span style="color:var(--rust)">'+esc(msg.err)+'</span>' : ''}</span>`;
+  return `<div class="a" data-i="${i}">${used ? `<button class="mem" data-act="mem">${ic('brain')}Used ${msg.mem.length} ${msg.mem.length > 1 ? 'memories' : 'memory'} from Lithium</button>${msg.showMem ? `<div class="memlist">${msg.mem.map(k => `<div>${ic('lock')} ${esc(MEM[k][0])}</div>`).join('')}</div>` : ''}` : ''}${blocks(parseMd(plain(msg)))}${caseTags}
+    <div class="acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="good" class="${msg.rate === 1 ? 'on' : ''}" aria-label="Good reply">${ic('good')}</button><button data-act="bad" class="${msg.rate === -1 ? 'on' : ''}" aria-label="Bad reply">${ic('bad')}</button><button data-act="regen" aria-label="Regenerate">${ic('retry')}</button>${n > 1 ? `<span class="ver"><button data-act="vprev" aria-label="Previous version">${ic('l')}</button>${msg.vi+1}/${n}<button data-act="vnext" aria-label="Next version">${ic('r')}</button></span>` : ''}${where}<span class="zm mini" aria-hidden="true"></span></div></div>`;
+}
+function renderThread(keep){
+  const c = chat();
+  app.classList.toggle('convo', !!c);
+  app.classList.toggle('casemode', !!(c && c.caseMode));
+  app.classList.toggle('inproj', !c && !!S.curProj);
+  $('projtag').textContent = S.curProj ? 'New chat in ' + (proj(S.curProj)||{}).name : '';
+  $('title').textContent = c ? c.title : 'New chat';
+  const off = c ? c.model === 'big' || c.msgs.some(x => x.off) : S.nextModel === 'big';
+  const pill = $('pill'); pill.className = 'pill' + (off ? ' off' : '');
+  pill.innerHTML = off ? ic('out') + 'Off-box<span class="case">Case file</span>' : ic('house') + 'On your box<span class="case">Case file</span>';
+  const model = c ? c.model : S.nextModel; const mb = $('model');
+  mb.className = 'chip' + (model === 'big' ? ' off' : ''); mb.innerHTML = model === 'big' ? 'Bigger model <i>off-box</i>' : 'Li 27B <i>local</i>';
+  q.placeholder = c ? 'Reply to Li' : 'Talk to Li';
+  const top = scroll.scrollTop;
+  thread.innerHTML = c ? c.msgs.map((x, i) => msgHTML(c, x, i)).join('') : '';
+  if(keep) scroll.scrollTop = top; else requestAnimationFrame(() => scroll.scrollTop = scroll.scrollHeight);
+  renderDrawer();
+}
+function renderDrawer(){
+  const f = $('find').value.trim().toLowerCase();
+  const match = c => !f || c.title.toLowerCase().includes(f) || c.msgs.some(x => plain(x).toLowerCase().includes(f));
+  const row = c => `<div class="r ${c.id === S.cur ? 'cur' : ''}"><button class="it" data-open="${c.id}">${c.caseMode ? ic('case') : c.model === 'big' ? ic('out') : ''}<span class="t">${esc(c.title)}</span></button><button class="dots" data-menu="${c.id}" aria-label="Options for ${esc(c.title)}">${ic('more')}</button></div>`;
+  const list = [...S.chats].sort((a,b) => b.t - a.t).filter(match);
+  const pins = list.filter(c => c.pinned);
+  $('pins').innerHTML = pins.map(row).join(''); $('pinlab').style.display = pins.length ? '' : 'none';
+  $('rec').innerHTML = list.filter(c => !c.pinned).map(row).join('') || '<div class="empty">No chats match.</div>';
+  $('projs').innerHTML = S.projects.map(p => `<div class="r"><button class="it" data-proj="${p.id}">${ic('folder')}<span class="t">${esc(p.name)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${S.chats.filter(c => c.proj === p.id).length}</span></button></div>`).join('');
+}
+
+/* ---------- drawer / sheets / panel ---------- */
+const openD = () => { document.body.classList.add('dopen'); renderDrawer(); };
+const closeD = () => document.body.classList.remove('dopen');
+function sheet(html){ $('sheetIn').innerHTML = html; document.body.classList.add('sopen'); }
+const closeS = () => { if(!document.body.classList.contains('locked')) document.body.classList.remove('sopen'); };
+$('menu').onclick = openD; $('dscrim').onclick = closeD; $('sscrim').onclick = closeS;
+$('find').oninput = renderDrawer;
+function newChat(projId){ S.cur = null; S.curProj = projId || null; pending = []; renderAtt(); closeD(); closeS(); renderThread(); save(); q.focus({preventScroll:true}); }
+$('newc').onclick = () => newChat(); $('dnew').onclick = () => newChat();
+function openChat(id){ S.cur = id; S.curProj = null; closeD(); closeS(); renderThread(); save(); }
+
+function chatMenu(id){
+  const c = S.chats.find(x => x.id === id); if(!c) return;
+  sheet(`<div class="sh">${esc(c.title)}</div>
+    <button class="opt" data-s="rename" data-id="${id}">${ic('edit')}Rename</button>
+    <button class="opt" data-s="pin" data-id="${id}">${ic('pin')}${c.pinned ? 'Unpin' : 'Pin to top'}</button>
+    <button class="opt" data-s="move" data-id="${id}">${ic('folder')}<span>Move to project<small>${c.proj ? 'Now in ' + esc(proj(c.proj).name) : 'Not in a project'}</small></span></button>
+    <button class="opt" data-s="case" data-id="${id}">${ic('case')}<span>Case file mode<small>Tag and number every message, export a packet</small></span><span class="sw ${c.caseMode ? 'on' : ''}"></span></button>
+    ${c.caseMode ? `<button class="opt" data-s="index" data-id="${id}">${ic('tag')}Case index and export</button>` : ''}`);
+}
+function renameSheet(id){
+  const c = S.chats.find(x => x.id === id);
+  sheet(`<div class="sh">Rename chat</div><input class="field" id="rn" value="${esc(c.title)}" maxlength="80"><div class="btns"><button class="btn" data-s="close">Cancel</button><button class="btn dark" data-s="dorename" data-id="${id}">Save</button></div>`);
+  setTimeout(() => { const i = $('rn'); if(i){ i.focus(); i.select(); } }, 280);
+}
+function moveSheet(id){
+  const c = S.chats.find(x => x.id === id);
+  sheet(`<div class="sh">Move to project</div>${S.projects.map(p => `<button class="opt" data-s="domove" data-id="${id}" data-p="${p.id}">${ic('folder')}${esc(p.name)}${c.proj === p.id ? `<span class="ck">${ic('check')}</span>` : ''}</button>`).join('')}<button class="opt" data-s="domove" data-id="${id}" data-p="">${ic('x')}No project${!c.proj ? `<span class="ck">${ic('check')}</span>` : ''}</button>`);
+}
+function projSheet(pid){
+  const p = proj(pid), chats = S.chats.filter(c => c.proj === pid);
+  sheet(`<div class="sh">Project</div>
+    <input class="field" id="pname" value="${esc(p.name)}" aria-label="Project name">
+    <div class="note">Instructions Li follows in every chat in this project</div>
+    <textarea class="field" id="pinstr" aria-label="Project instructions">${esc(p.instr)}</textarea>
+    <div class="lab" style="padding:0 4px 6px">Files <button data-s="pfile" data-p="${pid}">+ Add file</button></div>
+    <div class="files" style="justify-content:flex-start;max-width:100%;margin-bottom:12px">${fileChips(p.files) || '<span class="empty">No files yet</span>'}</div>
+    <div class="lab" style="padding:0 4px 4px">Chats</div>
+    <div class="list">${chats.map(c => `<div class="r"><button class="it" data-s="open" data-id="${c.id}">${esc(c.title)}</button></div>`).join('') || '<div class="empty">No chats yet</div>'}</div>
+    <div class="btns" style="margin-top:14px"><button class="btn" data-s="saveproj" data-p="${pid}">Save</button><button class="btn dark" data-s="projchat" data-p="${pid}">New chat here</button></div>`);
+}
+function memSheet(){
+  sheet(`<div class="sh">Memory</div>
+    <div class="note">${ic('lock')} Lithium isn't connected yet. Until it is, Li reads these starter notes on your box at the start of each chat. Read-only.</div>
+    <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes in chats<small>Off means Li starts each chat blank</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
+    ${MEM.map(([t,k]) => `<div class="memitem">${ic('lock')}<div>${esc(t)}<small>${esc(k)}</small></div></div>`).join('') || '<div class="empty">No starter notes on this box yet.</div>'}`);
+}
+function caseList(){
+  const cs = S.chats.filter(c => c.caseMode);
+  sheet(`<div class="sh">Case files</div><div class="note">Chats in case file mode. Every message is numbered and tagged on your box.</div>
+    <div class="list">${cs.map(c => `<div class="r"><button class="it" data-s="index" data-id="${c.id}">${ic('case')}<span class="t">${esc(c.title)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${c.msgs.length} exhibits</span></button></div>`).join('') || '<div class="empty">No case files yet. Turn on case file mode from a chat\'s menu.</div>'}</div>`);
+}
+function indexSheet(id, filter){
+  const c = S.chats.find(x => x.id === id), f = (filter || '').toLowerCase();
+  const rows = c.msgs.map((x, i) => ({x, i, tags:tagsFor(plain(x), x.files)})).filter(o => !f || plain(o.x).toLowerCase().includes(f) || o.tags.some(t => t.toLowerCase().includes(f)));
+  sheet(`<div class="sh">Case index · ${esc(c.title)}</div>
+    <label class="search" style="margin:0 0 8px">${ic('search')}<input id="exf" type="search" placeholder="Search exhibits and tags" value="${esc(filter||'')}" data-id="${id}"></label>
+    ${rows.map(o => `<button class="ex" data-s="goto" data-id="${id}" data-i="${o.i}"><b>${exLabel(c, o.i)}</b>${o.x.r === 'u' ? (ME.first || 'You') : 'Li'} · ${day(o.x.ts)} ${hm(o.x.ts)}<span class="q">${esc(plain(o.x))}</span>${o.tags.map(t => `<span class="tag" style="margin-right:4px">${esc(t)}</span>`).join('')}</button>`).join('') || '<div class="empty">Nothing matches.</div>'}
+    <div class="btns" style="margin-top:14px"><button class="btn" data-s="copypacket" data-id="${id}">${'Copy packet'}</button><button class="btn dark" data-s="packet" data-id="${id}">Open packet</button></div>`);
+}
+function packet(c){
+  const off = c.msgs.some(x => x.off) || c.model === 'big';
+  let s = `# Case packet: ${c.title}\nExported ${new Date().toLocaleString()} from Li. ${off ? 'Includes replies that were sent off-box.' : 'Everything stayed on your box.'}\n\n## Index\n| Exhibit | From | When | Tags |\n|---|---|---|---|\n`;
+  c.msgs.forEach((x, i) => s += `| ${exLabel(c, i)} | ${x.r === 'u' ? (ME.first || 'You') : 'Li'} | ${day(x.ts)} ${hm(x.ts)} | ${tagsFor(plain(x), x.files).join(', ')} |\n`);
+  s += '\n## Exhibits\n';
+  c.msgs.forEach((x, i) => { s += `\n### ${exLabel(c, i)} · ${x.r === 'u' ? (ME.first || 'You') : 'Li'} · ${day(x.ts)} ${hm(x.ts)}${x.off ? ' · off-box' : ''}\n${plain(x)}\n`; if(x.files && x.files.length) s += 'Attached: ' + x.files.map(f => f.n).join(', ') + '\n'; });
+  return s;
+}
+function modelSheet(){
+  const c = chat(), cur = c ? c.model : S.nextModel;
+  sheet(`<div class="sh">Model</div>
+    <button class="opt" data-s="model" data-m="local">${ic('house')}<span>Li 27B<small>Runs on your L4. Nothing leaves the box.</small></span>${cur === 'local' ? `<span class="ck">${ic('check')}</span>` : ''}</button>
+    <button class="opt" data-s="nobig" style="opacity:.55">${ic('out')}<span>Bigger model (off-box)<small>Not set up. Needs an outside API key first.</small></span></button>`);
+}
+function offSheet(){
+  sheet(`<div class="sh">Send this chat off-box?</div><div class="warnbox">Your messages, files and the memories Li uses would go to an outside model. Every reply from it gets an "off-box" mark, and the badge at the top turns amber. Client data should stay on Li 27B.</div>
+    <div class="btns"><button class="btn" data-s="close">Keep it local</button><button class="btn warn" data-s="gobig">Use bigger model</button></div>`);
+}
+function pillSheet(){
+  const c = chat(), msgs = c ? c.msgs.filter(x => x.r === 'a') : [], off = msgs.filter(x => x.off).length;
+  sheet(`<div class="sh">${off || (c ? c.model : S.nextModel) === 'big' ? 'Some of this chat left your box' : 'Everything stayed on your box'}</div>
+    <div class="memitem">${ic('house')}<div>${msgs.length - off} ${msgs.length - off === 1 ? 'reply' : 'replies'} from Li 27B<small>Ran on your L4 GPU</small></div></div>
+    <div class="memitem">${ic('out')}<div>${off} ${off === 1 ? 'reply' : 'replies'} from an outside model<small>${off ? 'Marked "Sent off-box" on each reply' : 'None'}</small></div></div>
+    <div class="memitem">${ic('brain')}<div>Starter notes<small>Read on your box, never sent out</small></div></div>
+    <div class="memitem">${ic('file')}<div>Chats and files<small>Saved in this browser, sent only to your box</small></div></div>`);
+}
+function settingsSheet(){
+  sheet(`<div class="sh">Settings</div>
+    <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes<small>Read-only</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
+    <button class="opt" data-s="memview">${ic('lock')}See the starter notes</button>
+    <a class="opt" href="/admin/users" style="text-decoration:none;color:inherit">${ic('gear')}<span>Admin<small>Accounts and models (Open WebUI)</small></span></a>
+    <button class="opt" data-s="signout">${ic('out')}Sign out</button>
+    <button class="opt danger" data-s="wipe">${ic('x')}Delete all chats on this device</button>`);
+}
+
+$('sheetIn').addEventListener('click', e => {
+  const b = e.target.closest('[data-s]'); if(!b) return;
+  const id = b.dataset.id, c = id && S.chats.find(x => x.id === id), s = b.dataset.s;
+  if(s === 'close') closeS();
+  else if(s === 'rename') renameSheet(id);
+  else if(s === 'dorename'){ const v = $('rn').value.trim(); if(v) c.title = v; closeS(); renderThread(true); save(); }
+  else if(s === 'pin'){ c.pinned = !c.pinned; closeS(); renderDrawer(); save(); toast(c.pinned ? 'Pinned' : 'Unpinned'); }
+  else if(s === 'move') moveSheet(id);
+  else if(s === 'domove'){ c.proj = b.dataset.p || null; closeS(); renderDrawer(); save(); toast(c.proj ? 'Moved to ' + proj(c.proj).name : 'Removed from project'); }
+  else if(s === 'case'){ c.caseMode = !c.caseMode; b.querySelector('.sw').classList.toggle('on', c.caseMode); renderThread(true); save(); chatMenu(id); }
+  else if(s === 'index') indexSheet(id);
+  else if(s === 'goto'){ openChat(id); requestAnimationFrame(() => { const el = thread.querySelector(`[data-i="${b.dataset.i}"]`); el && el.scrollIntoView({block:'center'}); }); }
+  else if(s === 'packet'){ closeS(); openPanel('Case packet · ' + c.title, null, packet(c)); }
+  else if(s === 'copypacket') copy(packet(c));
+  else if(s === 'open') openChat(id);
+  else if(s === 'saveproj'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; save(); renderDrawer(); toast('Project saved'); }
+  else if(s === 'projchat'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; newChat(p.id); }
+  else if(s === 'pfile'){ fileTarget = b.dataset.p; $('fproj').click(); }
+  else if(s === 'memtoggle'){ S.mem = !S.mem; b.querySelector('.sw').classList.toggle('on', S.mem); renderThread(true); save(); }
+  else if(s === 'memview') memSheet();
+  else if(s === 'nobig') toast('No outside model is set up, everything stays on your box');
+  else if(s === 'signout') signOut();
+  else if(s === 'wipe'){ sheet(`<div class="sh">Delete every chat on this device?</div><div class="warnbox">This clears chats, projects and case files saved in this browser. It can't be undone.</div><div class="btns"><button class="btn" data-s="close">Keep them</button><button class="btn warn" data-s="dowipe">Delete all</button></div>`); }
+  else if(s === 'dowipe'){ S = seed(); closeS(); renderThread(); save(); toast('Chats deleted'); }
+  else if(s === 'model'){ if(b.dataset.m === 'big'){ offSheet(); } else { const ch = chat(); if(ch) ch.model = 'local'; else S.nextModel = 'local'; closeS(); renderThread(true); save(); } }
+  else if(s === 'gobig'){ const ch = chat(); if(ch) ch.model = 'big'; else S.nextModel = 'big'; closeS(); renderThread(true); save(); toast('This chat now uses an off-box model'); }
+  else if(s === 'img'){ closeS(); $('fimg').click(); }
+  else if(s === 'file'){ closeS(); $('ffile').click(); }
+});
+$('sheetIn').addEventListener('input', e => { if(e.target.id === 'exf'){ const v = e.target.value, id = e.target.dataset.id, pos = e.target.selectionStart; indexSheet(id, v); const n = $('exf'); n.focus(); n.setSelectionRange(pos, pos); } });
+$('sheetIn').addEventListener('keydown', e => { if(e.target.id === 'rn' && e.key === 'Enter'){ e.preventDefault(); $('sheetIn').querySelector('[data-s="dorename"]').click(); } });
+
+$('drawer').addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'), mn = e.target.closest('[data-menu]'), pj = e.target.closest('[data-proj]');
+  if(o) openChat(o.dataset.open); else if(mn) chatMenu(mn.dataset.menu); else if(pj){ closeD(); projSheet(pj.dataset.proj); }
+});
+$('newproj').onclick = () => { const p = {id:'p'+Date.now(), name:'Untitled project', instr:'', files:[]}; S.projects.push(p); save(); closeD(); projSheet(p.id); };
+$('dmem').onclick = () => { closeD(); memSheet(); };
+$('dcase').onclick = () => { closeD(); caseList(); };
+$('settings').onclick = () => { closeD(); settingsSheet(); };
+$('more').onclick = () => { const c = chat(); if(c) chatMenu(c.id); };
+$('title').onclick = () => { const c = chat(); if(c) renameSheet(c.id); };
+$('pill').onclick = pillSheet;
+$('model').onclick = modelSheet;
+$('plus').onclick = () => sheet(`<div class="sh">Add to this message</div><button class="opt" data-s="img">${ic('img')}<span>Photos<small>Li looks at them on your box</small></span></button><button class="opt" data-s="file">${ic('file')}<span>Files<small>Text, code, CSV, Markdown. PDFs and Word come later</small></span></button>`);
+
+/* panel */
+let pv = {src:'', text:''};
+function openPanel(title, html, text){
+  pv = {src:html, text:text || html}; $('ptitle').textContent = title;
+  $('pseg').style.display = html ? '' : 'none';
+  showPanel(html ? 'preview' : 'code'); document.body.classList.add('popen');
+}
+function showPanel(v){
+  [...$('pseg').children].forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if(v === 'preview'){ const f = document.createElement('iframe'); f.setAttribute('sandbox', 'allow-scripts'); f.title = 'Live preview'; f.srcdoc = pv.src; $('pbody').replaceChildren(f); }
+  else $('pbody').innerHTML = `<pre>${esc(pv.text)}</pre>`;
+}
+$('pseg').onclick = e => { const b = e.target.closest('button'); if(b) showPanel(b.dataset.v); };
+$('pclose').onclick = () => document.body.classList.remove('popen');
+$('pcopy').onclick = () => copy(pv.text);
+
+/* ---------- uploads ---------- */
+let pending = [], fileTarget = null;
+function renderAtt(){ $('att').innerHTML = fileChips(pending, true); updateSend(); }
+$('att').onclick = e => { const b = e.target.closest('[data-rm]'); if(b){ pending.splice(+b.dataset.rm, 1); renderAtt(); } };
+const TEXTY = /\.(txt|md|markdown|csv|tsv|json|ya?ml|xml|html?|css|js|ts|py|ps1|sh|sql|log|ini|conf|toml)$/i;
+function addFiles(list){
+  [...list].forEach(f => {
+    const k = kind(f.name), e = {n:f.name, s:f.size, k, url: k === 'img' ? URL.createObjectURL(f) : ''};
+    pending.push(e);
+    if(k === 'img'){ if(f.size > 8e6){ e.skip = 'too big'; return; } const r = new FileReader(); r.onload = () => e.data = r.result; r.readAsDataURL(f); }
+    else if(TEXTY.test(f.name)){ if(f.size > 2e5){ e.skip = 'too big'; return; } f.text().then(t => e.text = t); }
+    else e.skip = 'unread';
+  });
+  renderAtt();
+}
+$('fimg').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('ffile').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('fproj').onchange = async e => { const p = proj(fileTarget); if(p){ for(const f of [...e.target.files]){ const x = {n:f.name, s:f.size, k:kind(f.name)}; if(TEXTY.test(f.name) && f.size <= 1e5) x.text = await f.text(); p.files.push(x); } save(); projSheet(p.id); } e.target.value = ''; };
+
+/* ---------- composer ---------- */
+function updateSend(){
+  const has = q.value.trim() || pending.length;
+  app.classList.toggle('hasText', !!has);
+  send.classList.toggle('hide', !has && !busy);
+}
+q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 160) + 'px'; updateSend(); });
+q.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer:coarse)').matches){ e.preventDefault(); $('form').requestSubmit(); } });
+
+/* ---------- the real thing: Open WebUI API on this box, streaming from Ollama ---------- */
+const token = () => localStorage.token || '';
+const api = (path, opt = {}) => fetch(path, {...opt, credentials:'same-origin', headers:{'Content-Type':'application/json', ...(token() ? {Authorization:'Bearer ' + token()} : {}), ...(opt.headers || {})}});
+function sysPrompt(c){
+  const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box. Nothing you see leaves this machine. Answer first, then explain. Never use em dashes.`];
+  if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
+  if(p){ if(p.instr) parts.push(`Project "${p.name}" instructions:\n${p.instr}`); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
+  if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
+  return parts.join('\n\n');
+}
+function userContent(x){
+  let text = x.t || '';
+  (x.files || []).forEach(f => { if(f.text) text += `\n\nFile ${f.n}:\n\`\`\`\n${f.text}\n\`\`\``; else if(f.k !== 'img' || !f.data) text += `\n\n[Attached ${f.n}, which Li can't read yet]`; });
+  const imgs = (x.files || []).filter(f => f.k === 'img' && f.data);
+  return imgs.length ? [{type:'text', text}, ...imgs.map(f => ({type:'image_url', image_url:{url:f.data}}))] : text;
+}
+let busy = false, ctl = null;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function respond(c, idx, alt){
+  busy = true; app.classList.add('busy'); updateSend(); send.setAttribute('aria-label', 'Stop');
+  const think = document.createElement('div'); think.className = 'think';
+  think.innerHTML = `<span class="zm mini spin" aria-hidden="true"></span><span class="lbl">Li is reading</span>`;
+  const target = thread.querySelector(`.a[data-i="${idx}"]`);
+  if(target) target.replaceWith(think); else thread.append(think);
+  toEnd(); window.liTps = 0;
+  const msgs = [{role:'system', content:sysPrompt(c)}];
+  c.msgs.slice(0, idx).forEach(x => msgs.push(x.r === 'u' ? {role:'user', content:userContent(x)} : {role:'assistant', content:plain(x)}));
+  let md = '', err = '', tps = null, toks = 0, first = 0, last = 0, inThink = false, a = null, body = null, tpsEl = null;
+  const stamps = [];
+  const tick = () => { const t = performance.now(); toks++; if(!first) first = t; last = t; stamps.push(t); while(stamps.length && t - stamps[0] > 1500) stamps.shift(); window.liTps = stamps.length > 2 ? (stamps.length - 1) / ((t - stamps[0]) / 1000) : 0; if(tpsEl) tpsEl.textContent = window.liTps ? window.liTps.toFixed(1) + ' tok/s' : ''; };
+  const show = () => {
+    const vis = md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').replace(/^\s+/, '');
+    if(!vis){ think.querySelector('.lbl').textContent = 'Li is thinking'; return; }
+    if(!a){
+      a = document.createElement('div'); a.className = 'a';
+      a.innerHTML = `<div class="body"></div><div class="acts"><span class="where">${ic('house')} On your box · <span class="tps" data-tps></span></span><span class="zm mini spin" aria-hidden="true"></span></div>`;
+      think.replaceWith(a); body = a.firstChild; tpsEl = a.querySelector('[data-tps]');
+    }
+    body.innerHTML = blocks(parseMd(vis)).replace(/<\/(p|li)>(<\/[uo]l>)?$/, '<span class="caret"></span></$1>$2');
+    toEnd(true);
+  };
+  ctl = new AbortController();
+  try{
+    const r = await api('/api/chat/completions', {method:'POST', signal:ctl.signal, body:JSON.stringify({model:MODEL, stream:true, messages:msgs, ...(alt ? {temperature:0.9} : {})})});
+    if(r.status === 401 || r.status === 403){ throw new Error('signin'); }
+    if(!r.ok || !r.body){ throw new Error('The box said ' + r.status + ' ' + (await r.text()).slice(0, 120)); }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for(;;){
+      const {value, done} = await rd.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let nl; while((nl = buf.indexOf('\n')) >= 0){
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if(!line.startsWith('data:')) continue;
+        const d = line.slice(5).trim(); if(d === '[DONE]') continue;
+        let j; try{ j = JSON.parse(d); }catch(e){ continue; }
+        if(j.error){ err = (j.error.message || String(j.error)).slice(0, 160); continue; }
+        const ch = j.choices && j.choices[0], dl = ch && ch.delta || {};
+        if(dl.reasoning_content || dl.reasoning){ tick(); think.querySelector('.lbl') && (think.querySelector('.lbl').textContent = 'Li is thinking'); }
+        if(dl.content){ md += dl.content; tick(); show(); }
+        const u = j.usage; if(u){ const v = u['response_token/s'] || (u.eval_count && u.eval_duration ? u.eval_count / (u.eval_duration / 1e9) : null); if(v) tps = +v; }
+      }
+    }
+  }catch(e){
+    if(e.name === 'AbortError') md += (md ? '\n\n' : '') + '*Stopped.*';
+    else if(e.message === 'signin'){ err = 'Signed out'; authSheet(); }
+    else err = e.message || 'Lost the connection to the box';
+  }
+  ctl = null; window.liTps = 0;
+  if(tps == null && toks > 4 && last > first) tps = (toks - 1) / ((last - first) / 1000);
+  const msg = c.msgs[idx] || {r:'a', v:[], vi:0, ts:Date.now()};
+  msg.v.push({md: md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim() || (err ? '' : '*No reply.*')}); msg.vi = msg.v.length - 1;
+  msg.tps = tps; msg.off = false; msg.ts = Date.now(); msg.mem = []; msg.err = err || undefined;
+  c.msgs[idx] = msg; c.t = Date.now();
+  busy = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
+  renderThread(true); toEnd(); save();
+}
+$('form').onsubmit = e => {
+  e.preventDefault();
+  if(busy){ ctl && ctl.abort(); return; }
+  const text = q.value.trim(); if(!text && !pending.length) return;
+  let c = chat();
+  if(!c){ c = {id:'c' + Date.now(), title:(text || pending[0].n).slice(0, 42), pinned:false, proj:S.curProj, model:S.nextModel, caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; S.nextModel = 'local'; }
+  if(pending.some(f => !f.skip && !f.text && !f.data)){ toast('Still reading your file, one sec'); return; }
+  c.msgs.push({r:'u', t:text || 'Here are the files.', files:pending.map(({n,s,k,url,text,data}) => ({n,s,k,url,text,data})), ts:Date.now()});
+  pending = []; renderAtt(); q.value = ''; q.style.height = 'auto';
+  renderThread(); respond(c, c.msgs.length, false);
+};
+
+/* message actions: copy, rate, regenerate, versions, edit, preview, memory chips */
+thread.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if(!b || busy) return;
+  const c = chat(), node = b.closest('[data-i]'), i = +node.dataset.i, msg = c.msgs[i], act = b.dataset.act;
+  if(act === 'copy') copy(plain(msg));
+  else if(act === 'good' || act === 'bad'){ const v = act === 'good' ? 1 : -1; msg.rate = msg.rate === v ? 0 : v; renderThread(true); save(); }
+  else if(act === 'regen') respond(c, i, true);
+  else if(act === 'vprev' || act === 'vnext'){ msg.vi = (msg.vi + (act === 'vnext' ? 1 : -1) + msg.v.length) % msg.v.length; renderThread(true); save(); }
+  else if(act === 'mem'){ msg.showMem = !msg.showMem; renderThread(true); }
+  else if(act === 'edit'){ msg.editing = true; renderThread(true); const ta = thread.querySelector('[data-edit]'); ta && ta.focus(); }
+  else if(act === 'canceledit'){ msg.editing = false; renderThread(true); }
+  else if(act === 'saveedit'){ const v = node.querySelector('[data-edit]').value.trim(); if(!v) return; msg.t = v; msg.editing = false; c.msgs.length = i + 1; renderThread(); respond(c, i + 1, false); }
+  else if(act === 'preview'){ const bl = parseMd(plain(msg))[+b.dataset.b].code; openPanel(bl.title, bl.src, bl.src); }
+  else if(act === 'copycode'){ copy(parseMd(plain(msg))[+b.dataset.b].code.src); }
+});
+
+/* ---------- talk mode waits for Lithium Live ---------- */
+$('mic').onclick = () => sheet(`<div class="sh">Talk mode</div><div class="note">${ic('lock')} Voice runs through Lithium Live, which isn't connected to Li yet. When it is, this button opens the voice screen. Typing works now.</div><div class="btns"><button class="btn dark" data-s="close">Got it</button></div>`);
+$('tend').onclick = () => document.body.classList.remove('talking');
+
+/* ---------- misc ---------- */
+function toEnd(soft){ if(soft && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 200) return; scroll.scrollTop = scroll.scrollHeight; }
+scroll.addEventListener('scroll', () => $('jump').classList.toggle('on', scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 160 && !!chat()));
+$('jump').onclick = () => toEnd();
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeS(); closeD(); document.body.classList.remove('popen'); } });
+const h = new Date().getHours();
+const greet = () => $('greet').textContent = (h < 5 ? 'Evening' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening') + (ME.first ? ', ' + ME.first : '');
+greet();
+
+/* ---------- sign in (Open WebUI accounts on this box) ---------- */
+function authSheet(first){
+  document.body.classList.add('locked');
+  sheet(`<div class="sh">${first ? 'Create your Li account' : 'Sign in to Li'}</div>
+    <div class="note">${ic('lock')} ${first ? 'First account on this box. It becomes the admin.' : 'Accounts live on your box.'}</div>
+    <form id="authf">
+      ${first ? '<input class="field" id="an" autocomplete="name" placeholder="Name" required>' : ''}
+      <input class="field" id="ae" type="email" autocomplete="username" placeholder="Email" required>
+      <input class="field" id="ap" type="password" autocomplete="${first ? 'new-password' : 'current-password'}" placeholder="Password" required>
+      <div class="note" id="aerr" style="color:var(--rust)"></div>
+      <div class="btns"><button class="btn dark" type="submit">${first ? 'Create account' : 'Sign in'}</button></div>
+    </form>`);
+  $('authf').onsubmit = async e => {
+    e.preventDefault(); $('aerr').textContent = '';
+    const body = first ? {name:$('an').value.trim(), email:$('ae').value.trim(), password:$('ap').value} : {email:$('ae').value.trim(), password:$('ap').value};
+    try{
+      const r = await fetch('/api/v1/auths/' + (first ? 'signup' : 'signin'), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      const j = await r.json().catch(() => ({}));
+      if(!r.ok || !j.token){ $('aerr').textContent = j.detail ? String(j.detail).slice(0, 160) : (j.mfa_required || j.mfa ? 'This account uses 2FA. Sign in at /auth once, then come back.' : 'That didn\'t work (' + r.status + ').'); return; }
+      localStorage.token = j.token; document.body.classList.remove('locked'); closeS(); boot();
+    }catch(err){ $('aerr').textContent = 'Couldn\'t reach the box.'; }
+  };
+}
+async function signOut(){ try{ await api('/api/v1/auths/signout', {method:'POST'}); }catch(e){} delete localStorage.token; closeS(); authSheet(false); }
+async function boot(){
+  try{
+    const r = await api('/api/v1/auths/');
+    if(!r.ok){
+      const cfg = await fetch('/api/config', {credentials:'same-origin'}).then(x => x.json()).catch(() => ({}));
+      authSheet(!!cfg.onboarding); return;
+    }
+    const u = await r.json(); ME = {name:u.name || '', first:(u.name || '').split(' ')[0]};
+    $('meName').textContent = ME.name || 'You'; $('meAv').textContent = (ME.name || 'Y')[0].toUpperCase(); greet();
+    try{ const n = await fetch('/li/notes.json', {credentials:'same-origin', cache:'no-store'}).then(x => x.json()); MEM = (n.notes || []).map(o => [o.text, o.kind || '']); }catch(e){ MEM = []; }
+    const m = await api('/api/models').then(x => x.json()).catch(() => ({}));
+    const ids = (m.data || []).map(x => x.id);
+    MODEL = ids.find(x => /qwen3\.8|abliterated/i.test(x)) || ids[0] || '';
+    if(!MODEL) toast('No model found on the box');
+    renderThread();
+  }catch(e){ toast('Couldn\'t reach the box'); }
+}
+renderThread(); updateSend(); boot();
+}
+</script>
+
+<script src="/li/vendor/three.min.js"></script>
+<script src="/li/vendor/RoomEnvironment.js"></script>
+<script>
+{
+/* Zeid Data 3D Z: outline from the brand mark (mark.json, the same outline the 3D renders are extruded from) */
+const MARK = {"w":0.95817,"h":1.0,"o":[[0.1144,0.826],[0.1018,0.8478],[0.0964,0.8597],[0.0917,0.8721],[0.0858,0.8924],[0.0707,0.9554],[0.0707,0.9633],[0.072,0.9705],[0.0749,0.9778],[0.0792,0.9846],[0.0823,0.9881],[0.0885,0.9931],[0.0955,0.9969],[0.1024,0.999],[0.1109,1.0],[0.8255,1.0],[0.8283,0.9994],[0.8307,0.9979],[0.8322,0.9955],[0.8328,0.9928],[0.8328,0.7319],[0.8322,0.7291],[0.8307,0.7268],[0.8263,0.7247],[0.4379,0.7248],[0.4263,0.7276],[0.416,0.7336],[0.4099,0.7398],[0.4039,0.75],[0.4012,0.7609],[0.4011,0.7688],[0.4028,0.7773],[0.4059,0.7846],[0.4104,0.7912],[0.4187,0.7987],[0.4263,0.8028],[0.4339,0.8051],[0.4417,0.8058],[0.7516,0.8058],[0.7516,0.9188],[0.1628,0.9188],[0.1694,0.8959],[0.1772,0.8788],[0.1884,0.8617],[0.1952,0.857],[0.2012,0.8508],[0.2054,0.844],[0.2083,0.8363],[0.2155,0.8282],[0.2363,0.8074],[0.2557,0.7914],[0.2765,0.7775],[0.3045,0.7626],[0.3314,0.7509],[0.3655,0.7386],[0.4067,0.7261],[0.4374,0.7185],[0.4822,0.7108],[0.5782,0.6987],[0.6917,0.6821],[0.7282,0.6754],[0.7586,0.6675],[0.7812,0.6594],[0.8022,0.6503],[0.8219,0.6401],[0.8373,0.6307],[0.8543,0.6187],[0.8704,0.6051],[0.8855,0.5902],[0.8975,0.5762],[0.9105,0.5581],[0.924,0.5353],[0.9354,0.5117],[0.9446,0.4877],[0.9513,0.4644],[0.9554,0.4431],[0.9579,0.4183],[0.9582,0.3935],[0.9557,0.365],[0.9505,0.3381],[0.9436,0.3171],[0.9337,0.2956],[0.9177,0.2687],[0.8876,0.2255],[0.8694,0.2027],[0.8439,0.174],[0.8566,0.1522],[0.8619,0.1403],[0.8666,0.1279],[0.8725,0.108],[0.8819,0.0672],[0.8871,0.0486],[0.8877,0.0374],[0.8861,0.0289],[0.8814,0.0187],[0.876,0.0119],[0.8699,0.0069],[0.8629,0.0031],[0.8553,0.0008],[0.8475,0.0],[0.1328,0.0],[0.13,0.0006],[0.1277,0.0021],[0.1261,0.0045],[0.1255,0.0073],[0.1255,0.2681],[0.1261,0.2709],[0.1277,0.2732],[0.1321,0.2753],[0.5205,0.2752],[0.532,0.2724],[0.5423,0.2664],[0.5504,0.2576],[0.5545,0.25],[0.5567,0.2424],[0.5573,0.2312],[0.5558,0.2233],[0.5524,0.2154],[0.5458,0.2064],[0.5397,0.2013],[0.5327,0.1974],[0.5244,0.1949],[0.5167,0.1942],[0.2067,0.1942],[0.2067,0.0812],[0.7955,0.0812],[0.789,0.1041],[0.7812,0.1212],[0.77,0.1383],[0.7631,0.143],[0.7571,0.1492],[0.7529,0.156],[0.75,0.1637],[0.7428,0.1719],[0.722,0.1926],[0.6993,0.2111],[0.6781,0.2247],[0.6495,0.2394],[0.6222,0.2509],[0.5877,0.2631],[0.5517,0.2739],[0.5209,0.2815],[0.4761,0.2892],[0.3801,0.3013],[0.2666,0.318],[0.2306,0.3245],[0.2047,0.331],[0.1855,0.3374],[0.1644,0.3459],[0.1475,0.3539],[0.1289,0.3643],[0.1139,0.3741],[0.1002,0.3844],[0.0848,0.3978],[0.0723,0.4104],[0.0554,0.4309],[0.0386,0.457],[0.0247,0.4844],[0.0183,0.4998],[0.0127,0.5157],[0.0053,0.5438],[0.0014,0.5692],[0.0,0.5977],[0.0015,0.6263],[0.0052,0.6503],[0.0105,0.671],[0.0179,0.6905],[0.0287,0.7118],[0.0446,0.7374],[0.0728,0.7772],[0.0891,0.7975],[0.1144,0.826]],"hs":[[[0.1662,0.7622],[0.1489,0.7426],[0.136,0.7263],[0.1101,0.6893],[0.0966,0.6669],[0.0901,0.6529],[0.086,0.6396],[0.0826,0.6208],[0.0813,0.6035],[0.0819,0.5801],[0.0853,0.5575],[0.0918,0.535],[0.1003,0.5143],[0.1124,0.4916],[0.1247,0.474],[0.1382,0.459],[0.1559,0.4439],[0.1762,0.4306],[0.1969,0.4203],[0.2207,0.411],[0.2433,0.4048],[0.2792,0.3981],[0.3857,0.3825],[0.4751,0.3713],[0.5187,0.3646],[0.5563,0.3566],[0.6126,0.3403],[0.6458,0.3288],[0.6727,0.3179],[0.6986,0.3058],[0.7185,0.2952],[0.7374,0.2834],[0.7559,0.27],[0.7727,0.2561],[0.7922,0.2378],[0.8075,0.2551],[0.8206,0.2714],[0.8531,0.3183],[0.8618,0.3332],[0.8682,0.347],[0.8724,0.3605],[0.8757,0.3792],[0.8771,0.3965],[0.8769,0.4141],[0.8746,0.4342],[0.8702,0.4534],[0.8632,0.4739],[0.8538,0.4944],[0.8425,0.5137],[0.8318,0.5284],[0.8181,0.543],[0.8024,0.5561],[0.7822,0.5694],[0.7614,0.5797],[0.7376,0.589],[0.715,0.5952],[0.6791,0.6019],[0.5727,0.6175],[0.4833,0.6288],[0.4396,0.6354],[0.402,0.6434],[0.3457,0.6597],[0.3177,0.6693],[0.2906,0.68],[0.2648,0.6916],[0.2442,0.7024],[0.225,0.7139],[0.2068,0.7266],[0.186,0.7435],[0.1662,0.7622]]]};
+const RUST = ['#9c3a16','#c0521f','#7a2a0e','#b04519','#d06a34','#8a3213'];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* flat SVG fallback, filled with a metallic rust gradient */
+const pts = a => 'M' + a.map(([x,y]) => (x*1000).toFixed(0)+' '+(y*1000).toFixed(0)).join(' L') + 'Z';
+const svgMark = '<svg viewBox="-20 -20 998 1040" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">'
+  + '<stop offset="0" stop-color="#f0a070"/><stop offset=".35" stop-color="#b4451e"/><stop offset=".6" stop-color="#7a2a0e"/><stop offset=".8" stop-color="#d0662c"/><stop offset="1" stop-color="#8f3312"/></linearGradient></defs>'
+  + '<path fill="url(#rg)" fill-rule="evenodd" d="' + pts(MARK.o) + MARK.hs.map(pts).join('') + '"/></svg>';
+
+let gl = null, still = null, raf = 0;
+const live = new Set();
+function dress(el){
+  if(el.dataset.z) return; el.dataset.z = 1;
+  const anim = el.classList.contains('spin') || el.classList.contains('idle');
+  if(gl && anim && !reduce){ const c = document.createElement('canvas'); el.replaceChildren(c); live.add(el); tick(); }
+  else if(gl && still){ const i = new Image(); i.src = still; i.alt = ''; el.replaceChildren(i); }
+  else el.innerHTML = svgMark;
+}
+const dressAll = () => document.querySelectorAll('.zm').forEach(dress);
+new MutationObserver(() => { dressAll(); for(const el of live) if(!el.isConnected) live.delete(el); }).observe(document.body, {childList:true, subtree:true});
+dressAll();
+
+/* real 3D: extruded mark, shiny rust metal */
+try{
+  if(!window.THREE) throw 0;
+  const ren = new THREE.WebGLRenderer({alpha:true, antialias:true, preserveDrawingBuffer:true});
+  const S = 512; ren.setSize(S, S, false); ren.outputEncoding = THREE.sRGBEncoding;
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, .1, 50); cam.position.z = 4.4;
+  let env = null; try{ env = new THREE.PMREMGenerator(ren).fromScene(new THREE.RoomEnvironment(), .04).texture; }catch(e){}
+  const path = (P, a) => { P.moveTo(a[0][0]-MARK.w/2, MARK.h/2-a[0][1]); for(let i=1;i<a.length;i++) P.lineTo(a[i][0]-MARK.w/2, MARK.h/2-a[i][1]); P.closePath(); return P; };
+  const sh = path(new THREE.Shape(), MARK.o); MARK.hs.forEach(h => sh.holes.push(path(new THREE.Path(), h)));
+  const geo = new THREE.ExtrudeGeometry(sh, {depth:.16, bevelEnabled:true, bevelThickness:.025, bevelSize:.012, bevelSegments:6, curveSegments:1});
+  geo.translate(0, 0, -.08); geo.computeVertexNormals();
+  const mat = new THREE.MeshPhysicalMaterial({color:new THREE.Color(RUST[0]).convertSRGBToLinear(), metalness:.78, roughness:.3, clearcoat:.7, clearcoatRoughness:.12, envMap:env, envMapIntensity:1.5});
+  const mesh = new THREE.Mesh(geo, mat); mesh.scale.setScalar(1.75); scene.add(mesh);
+  scene.add(new THREE.AmbientLight(0xffffff, env ? .2 : .7));
+  const k = new THREE.DirectionalLight(0xfff1e0, 1.5); k.position.set(-1.5, 2.5, 6); scene.add(k);
+  const r = new THREE.DirectionalLight(0xffb27a, .6); r.position.set(4, -2, -3); scene.add(r);
+  const ca = new THREE.Color(), cb = new THREE.Color();
+  function pose(ry, rx, t){
+    mesh.rotation.set(rx, ry, 0);
+    if(t == null) mat.color.set(RUST[0]).convertSRGBToLinear();
+    else { const f = t % RUST.length, i = Math.floor(f), m = f - i;
+      mat.color.copy(ca.set(RUST[i]).convertSRGBToLinear().lerp(cb.set(RUST[(i+1)%RUST.length]).convertSRGBToLinear(), m)); }
+    ren.render(scene, cam);
+  }
+  pose(-.3, .14); still = ren.domElement.toDataURL('image/png');
+  document.getElementById('fav').href = still;
+  gl = {ren, pose};
+  document.querySelectorAll('.zm').forEach(el => { delete el.dataset.z; dress(el); });
+}catch(e){ gl = null; }
+
+function tick(){ if(!raf && live.size) raf = requestAnimationFrame(frame); }
+let lastT = 0;
+function frame(now){
+  raf = 0; if(!gl || !live.size){ lastT = 0; return; }
+  const t = now/1000, dt = Math.min(.1, lastT ? t - lastT : 0); lastT = t;
+  /* live Z: spin speed follows the model's tokens per second (window.liTps); 0 = still reading the prompt */
+  const tps = window.liTps || 0, speed = tps ? .9 + tps*.24 : 2.6;
+  for(const el of live){
+    const c = el.firstChild, w = el.clientWidth, d = Math.min(devicePixelRatio || 1, 2);
+    if(!w) continue;
+    if(c.width !== Math.round(w*d)){ c.width = c.height = Math.round(w*d); }
+    if(el.classList.contains('spin')){ el._a = (el._a||0) + dt*speed; gl.pose(el._a, .12, t*1.6); }   /* thinking: spin and roll through the rust tones */
+    else gl.pose(Math.sin(t*.6)*.55, .14 + Math.sin(t*.4)*.05);       /* resting: slow sway so it reads as metal */
+    const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); x.drawImage(gl.ren.domElement, 0, 0, c.width, c.height);
+  }
+  tick();
+}
+}
+</script>
+</body>
+</html>
