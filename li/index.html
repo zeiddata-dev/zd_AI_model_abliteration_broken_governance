@@ -155,6 +155,19 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;z-index:31;background:var(--card);border-radius:22px 22px 0 0;padding:8px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .26s cubic-bezier(.3,.7,.2,1);max-height:86dvh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.1)}
 .scrim.s{z-index:30}
 .sopen .sheet{transform:none}
+/* sign-in: a centered card over a soft blur, first thing a visitor sees */
+.locked .scrim.s{background:rgba(246,244,239,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.locked .sheet{top:50%;bottom:auto;left:50%;right:auto;width:min(360px,calc(100vw - 36px));max-width:none;border-radius:24px;padding:26px 22px 22px;box-shadow:0 24px 60px rgba(29,28,26,.18),0 2px 8px rgba(29,28,26,.06);transform:translate(-50%,-46%);opacity:0;transition:transform .3s cubic-bezier(.3,.7,.2,1),opacity .25s}
+.locked.sopen .sheet{transform:translate(-50%,-50%);opacity:1}
+.locked .sheet .grab{display:none}
+.authhead{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:16px}
+.authhead .zm{width:64px;height:64px;margin-bottom:10px}
+.authhead h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+.authhead p{margin:6px 0 0;color:var(--ink2);font-size:13.5px;display:flex;align-items:center;gap:6px}
+.authhead p svg{width:14px;height:14px}
+#authf .field{margin-bottom:10px}
+#authf .btn.dark{width:100%;height:46px;border-radius:23px;font-size:15px}
+#authf .btns{margin-top:6px}
 .grab{width:38px;height:5px;border-radius:3px;background:var(--soft2);margin:0 auto 10px}
 .sh{font-size:17px;font-weight:600;margin:4px 4px 10px}
 .sbody{overflow-y:auto;scrollbar-width:none}
@@ -872,8 +885,8 @@ greet();
 /* ---------- sign in (Open WebUI accounts on this box) ---------- */
 function authSheet(first){
   document.body.classList.add('locked');
-  sheet(`<div class="sh">${first ? 'Create your Li account' : 'Sign in to Li'}</div>
-    <div class="note">${ic('lock')} ${first ? 'First account on this box. It becomes the admin.' : 'Accounts live on your box.'}</div>
+  sheet(`<div class="authhead"><span class="zm spin" aria-hidden="true"></span><h2>${first ? 'Create your Li account' : 'Sign in to Li'}</h2>
+    <p>${ic('lock')} ${first ? 'First account on this box. It becomes the admin.' : 'Private. Runs on your own GPU.'}</p></div>
     <form id="authf">
       ${first ? '<input class="field" id="an" autocomplete="name" placeholder="Name" required>' : ''}
       <input class="field" id="ae" type="email" autocomplete="username" placeholder="Email" required>
