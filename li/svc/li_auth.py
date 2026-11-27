@@ -5,7 +5,12 @@ Nothing here stores a password: Open WebUI keeps those. Invite codes are stored 
 import asyncio, base64, hashlib, json, os, secrets, sqlite3, sys, threading, time
 from datetime import timedelta
 
+sys.path.insert(1, os.environ.get('LI_BACKEND', '/app/backend'))  # Open WebUI's own package
 sys.path.append(os.environ.get('LI_PYLIB', '/app/backend/data/li/pylib'))
+try:
+    open('/tmp/li_auth.pid', 'w').write(str(os.getpid()))
+except Exception:
+    pass
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request

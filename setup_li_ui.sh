@@ -96,14 +96,19 @@ sudo chown -R root:root "$WWW"; sudo find "$WWW" -type d -exec chmod 755 {} +; s
 # 5. Caddy: same gate, Li at / and /li/*, Open WebUI for everything else
 sudo cp -a /etc/caddy/Caddyfile "$BACKUP/Caddyfile.bak"
 if [ "$GATE" = "off" ]; then
-# No private-link gate: anyone reaching the domain gets Li's sign-in. New sign-ups are refused here,
-# so only accounts that already exist can get in.
+# No private-link gate: anyone reaching the domain gets Li's sign-in. Open sign-ups are refused here;
+# new accounts come only through an admin's invite (li-auth on 127.0.0.1:3010, see setup_li_accounts.sh).
 sudo tee /etc/caddy/Caddyfile >/dev/null <<CADDYEOF
 $DOMAIN {
 	encode zstd gzip
+	redir /setup/* / 302
+	redir /li / 302
 	@signup path /api/v1/auths/signup
 	handle @signup {
 		respond "Sign-ups are closed" 403
+	}
+	handle /li-auth/* {
+		reverse_proxy 127.0.0.1:3010
 	}
 	@li path / /index.html /li/*
 	handle @li {
@@ -172,7 +177,8 @@ CFG=$(curl -s --max-time 15 -b "$JAR" "https://$DOMAIN/api/config" | grep -c '"v
 ADMIN=$(c -b "$JAR" "https://$DOMAIN/admin/users")
 SIGNUP=$(c -X POST -H 'Content-Type: application/json' -d '{}' "https://$DOMAIN/api/v1/auths/signup")
 rm -f "$JAR"
-echo "gate=$GATE stranger=$STRANGER li_root=$ROOT three=$THREE notes=$NOTES api_config=$CFG admin=$ADMIN signup=$SIGNUP"
+LIAUTH=$(c "https://$DOMAIN/li-auth/health")
+echo "li_auth=$LIAUTH gate=$GATE stranger=$STRANGER li_root=$ROOT three=$THREE notes=$NOTES api_config=$CFG admin=$ADMIN signup=$SIGNUP"
 if [ "$GATE" = "off" ]; then WANT_STRANGER=200; else WANT_STRANGER=403; fi
 if [ "$GATE" = "off" ] && [ "$SIGNUP" != "403" ]; then ROUTES="SIGNUP_OPEN_$SIGNUP"; warn "Sign-up is not blocked"; finish READY_CHECK 0; fi
 if [ "$STRANGER" = "$WANT_STRANGER" ] && [ "$ROOT" = "1" ] && [ "$NOTES" = "200" ] && [ "$CFG" = "1" ] && [ "$ADMIN" = "200" ]; then
