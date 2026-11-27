@@ -440,9 +440,10 @@ function msgHTML(c, msg, i){
     if(msg.editing) return `<div class="u" data-i="${i}"><div class="edit"><textarea data-edit>${esc(msg.t)}</textarea><div class="row btns"><button class="btn" data-act="canceledit">Cancel</button><button class="btn dark" data-act="saveedit">Save and resend</button></div></div></div>`;
     return `<div class="u" data-i="${i}">${msg.files && msg.files.length ? `<div class="files">${fileChips(msg.files)}</div>` : ''}<div class="b">${esc(msg.t)}</div>${caseTags}<div class="uacts acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="edit" aria-label="Edit">${ic('edit')}</button></div></div>`;
   }
-  const n = msg.v.length, used = false;
-  const where = msg.off ? `<span class="where"><span class="off">${ic('out')} Sent off-box</span></span>` : `<span class="where">${ic('house')} On your box${msg.tps ? ' · '+msg.tps.toFixed(1)+' tok/s' : ''}${msg.err ? ' · <span style="color:var(--rust)">'+esc(msg.err)+'</span>' : ''}</span>`;
-  return `<div class="a" data-i="${i}">${used ? `<button class="mem" data-act="mem">${ic('brain')}Used ${msg.mem.length} ${msg.mem.length > 1 ? 'memories' : 'memory'} from Lithium</button>${msg.showMem ? `<div class="memlist">${msg.mem.map(k => `<div>${ic('lock')} ${esc(MEM[k][0])}</div>`).join('')}</div>` : ''}` : ''}${blocks(parseMd(plain(msg)))}${caseTags}
+  const n = msg.v.length, used = msg.mem && msg.mem.length && S.mem && MEM.length;
+  const where = msg.off ? `<span class="where"><span class="off">${ic('out')} Sent off-box</span></span>` : `<span class="where">${ic('house')} On your box${msg.tps ? ' · '+msg.tps.toFixed(1)+' tok/s' : ''}</span>`;
+  const errBox = msg.err ? `<div class="warnbox" style="margin:6px 0 4px;display:flex;gap:10px;align-items:center;justify-content:space-between"><span>${esc(msg.err)}</span><button class="btn dark" data-act="retry" style="flex:none">Retry</button></div>` : '';
+  return `<div class="a" data-i="${i}">${used ? `<button class="mem" data-act="mem">${ic('brain')}Used ${msg.mem.length} starter ${msg.mem.length > 1 ? 'notes' : 'note'}</button>${msg.showMem ? `<div class="memlist">${msg.mem.filter(k => MEM[k]).map(k => `<div>${ic('lock')} ${esc(MEM[k][0])}</div>`).join('')}</div>` : ''}` : ''}${blocks(parseMd(plain(msg)))}${errBox}${caseTags}
     <div class="acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="good" class="${msg.rate === 1 ? 'on' : ''}" aria-label="Good reply">${ic('good')}</button><button data-act="bad" class="${msg.rate === -1 ? 'on' : ''}" aria-label="Bad reply">${ic('bad')}</button><button data-act="regen" aria-label="Regenerate">${ic('retry')}</button>${n > 1 ? `<span class="ver"><button data-act="vprev" aria-label="Previous version">${ic('l')}</button>${msg.vi+1}/${n}<button data-act="vnext" aria-label="Next version">${ic('r')}</button></span>` : ''}${where}<span class="zm mini" aria-hidden="true"></span></div></div>`;
 }
 function renderThread(keep){
@@ -691,7 +692,16 @@ function userContent(x){
   const imgs = (x.files || []).filter(f => f.k === 'img' && f.data);
   return imgs.length ? [{type:'text', text}, ...imgs.map(f => ({type:'image_url', image_url:{url:f.data}}))] : text;
 }
-let busy = false, ctl = null;
+let busy = false, ctl = null, leftPage = false;
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ if(busy) leftPage = true; return; }
+  /* back on the page: if a reply died while you were away, try it again once */
+  const c = chat(); if(!c || busy) return;
+  const i = c.msgs.length - 1, m = c.msgs[i];
+  if(m && m.r === 'a' && m.retryOnShow){ m.retryOnShow = false; toast('Picking the reply back up'); respond(c, i, false); }
+  /* and check the sign-in is still good */
+  api('/api/v1/auths/').then(r => { if(r.status === 401) authSheet(false); }).catch(() => {});
+});
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function respond(c, idx, alt){
   busy = true; app.classList.add('busy'); updateSend(); send.setAttribute('aria-label', 'Stop');
@@ -716,7 +726,7 @@ async function respond(c, idx, alt){
     body.innerHTML = blocks(parseMd(vis)).replace(/<\/(p|li)>(<\/[uo]l>)?$/, '<span class="caret"></span></$1>$2');
     toEnd(true);
   };
-  ctl = new AbortController();
+  ctl = new AbortController(); leftPage = document.hidden;
   const slow = setTimeout(() => { const l = think.querySelector('.lbl'); if(l && !toks) l.textContent = 'Waking up the 27B. After a break the first reply takes a couple of minutes.'; }, 8000);
   try{
     const r = await api('/api/chat/completions', {method:'POST', signal:ctl.signal, body:JSON.stringify({model:MODEL, stream:true, messages:msgs, ...(alt ? {temperature:0.9} : {})})});
@@ -738,18 +748,22 @@ async function respond(c, idx, alt){
         const u = j.usage; if(u){ const v = u['response_token/s'] || (u.eval_count && u.eval_duration ? u.eval_count / (u.eval_duration / 1e9) : null); if(v) tps = +v; }
       }
     }
+    if(!toks && !err) err = 'The box ended the reply early. Tap retry.';
   }catch(e){
-    if(e.name === 'AbortError') md += (md ? '\n\n' : '') + '*Stopped.*';
+    if(e.name === 'AbortError' && !leftPage) md += (md ? '\n\n' : '') + '*Stopped.*';
     else if(e.message === 'signin'){ err = 'Signed out'; authSheet(); }
-    else err = e.message || 'Lost the connection to the box';
+    else if(leftPage || document.hidden) err = 'The reply stopped when you left the page. It picks back up when you return.';
+    else if(/failed to fetch|load failed|network|connection/i.test(e.message || '')) err = "Couldn't reach the box. Check your signal and tap retry.";
+    else err = e.message || "Couldn't reach the box. Tap retry.";
   }
   clearTimeout(slow); ctl = null; window.liTps = 0;
   if(tps == null && toks > 4 && last > first) tps = (toks - 1) / ((last - first) / 1000);
   const msg = c.msgs[idx] || {r:'a', v:[], vi:0, ts:Date.now()};
+  if(msg.err && msg.v.length && !String(msg.v[msg.v.length - 1].md || '').trim()) msg.v.pop(); /* a retry replaces the failed empty try */
   msg.v.push({md: md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim() || (err ? '' : '*No reply.*')}); msg.vi = msg.v.length - 1;
-  msg.tps = tps; msg.off = false; msg.ts = Date.now(); msg.mem = []; msg.err = err || undefined;
+  msg.tps = tps; msg.off = false; msg.ts = Date.now(); msg.mem = S.mem && MEM.length ? MEM.map((m, k) => k) : []; msg.err = err || undefined; msg.retryOnShow = !!(err && (leftPage || document.hidden));
   c.msgs[idx] = msg; c.t = Date.now();
-  busy = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
+  busy = false; leftPage = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
   renderThread(true); toEnd(); save();
   return err ? '' : plain(msg);
 }
@@ -772,6 +786,7 @@ thread.addEventListener('click', e => {
   if(act === 'copy') copy(plain(msg));
   else if(act === 'good' || act === 'bad'){ const v = act === 'good' ? 1 : -1; msg.rate = msg.rate === v ? 0 : v; renderThread(true); save(); }
   else if(act === 'regen') respond(c, i, true);
+  else if(act === 'retry'){ msg.retryOnShow = false; respond(c, i, false); }
   else if(act === 'vprev' || act === 'vnext'){ msg.vi = (msg.vi + (act === 'vnext' ? 1 : -1) + msg.v.length) % msg.v.length; renderThread(true); save(); }
   else if(act === 'mem'){ msg.showMem = !msg.showMem; renderThread(true); }
   else if(act === 'edit'){ msg.editing = true; renderThread(true); const ta = thread.querySelector('[data-edit]'); ta && ta.focus(); }
