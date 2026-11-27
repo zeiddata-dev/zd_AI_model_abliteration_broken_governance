@@ -54,8 +54,10 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .home{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:30px}
 .greet{font-family:var(--serif);font-size:30px;font-weight:400;letter-spacing:-.01em;margin:18px 0 0}
 .sub{font-size:14px;color:var(--dim);margin-top:8px}
-.projtag{margin-top:14px;font-size:13px;color:var(--ink2);background:var(--soft);border-radius:10px;padding:6px 10px;display:none}
-.inproj .projtag{display:inline-block}
+.hash{width:16px;text-align:center;color:var(--dim);font-weight:600;flex:none}
+.projtag{cursor:pointer;margin-top:14px;font-size:13px;color:var(--ink2);background:var(--soft);border-radius:10px;padding:6px 10px;display:none}
+.inproj .hash{width:16px;text-align:center;color:var(--dim);font-weight:600;flex:none}
+.projtag{cursor:pointer;display:inline-block}
 .convo .home{display:none}
 .thread{display:none}.convo .thread{display:block}
 
@@ -340,7 +342,7 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
     <button id="dcase"></button>
   </div>
   <div class="dscroll">
-    <div class="lab">Projects <button id="newproj">+ New</button></div>
+    <div class="lab">Channels <button id="newproj">+ New</button></div>
     <div class="list" id="projs"></div>
     <div class="lab" id="pinlab">Pinned</div>
     <div class="list" id="pins"></div>
@@ -428,6 +430,25 @@ if(!S.voice || S.voice.v !== 2) S.voice = {on:true, name:(S.voice && S.voice.nam
 let ME = {name:'', first:'', id:'', role:''}, MODEL = '';
 const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S, (k,v) => (k==='url' || k==='data') ? undefined : v)); }catch(e){ toast('Storage is full, older chats may not save'); } };
 
+
+/* ---------- channels: one per case-file category, each with its own instructions and reference sources ---------- */
+const CHANNELS = [
+ {name:'Fraud', instr:"Channel: Fraud. Treat every chat here as part of a fraud case file: check fraud, wire and payment fraud, identity theft, elder fraud, insurance and billing fraud, scams. Pull out who, what, when, how much and which account or instrument, and lay the money trail out in order. Name the red flags you see (altered or counterfeit checks, mismatched payee, rush requests, changed payment details). Keep what the documents show separate from what you infer, and say which is which. Point to the right place to report or look something up when it helps. Keep dates, amounts and names exactly as written.",
+  src:[['FBI IC3 (Internet Crime Complaint Center)','https://www.ic3.gov/','FBI complaint intake and annual internet crime reports'],['FTC ReportFraud','https://reportfraud.ftc.gov/','Where consumer fraud is reported in the US'],['ACFE Fraud Resources','https://www.acfe.com/fraud-resources','Association of Certified Fraud Examiners guides and fraud tree'],['US Postal Inspection Service','https://www.uspis.gov/','Mail theft and check fraud'],['FinCEN','https://www.fincen.gov/','US Treasury financial crimes unit, alerts and SAR guidance'],['CFPB','https://www.consumerfinance.gov/','Consumer finance complaints and scam guides'],['Wikipedia: Cheque fraud','https://en.wikipedia.org/wiki/Cheque_fraud','Check fraud types: kiting, washing, forgery']]},
+ {name:'Drugs', instr:"Channel: Drugs. Case work involving drugs and controlled substances. Give accurate pharmacology: what the substance is, street and chemical names, effects, documented dosing ranges, interactions, overdose signs and legal schedule (federal, and Texas when it matters). Help identify substances from descriptions, slang, packaging, pill imprints and lab results. Lead with the safety facts when someone's health could be at risk. Say which source a fact comes from when it matters.",
+  src:[['Erowid','https://erowid.org/','Substance vaults: effects, dosing, experience reports'],['DrugsData (Erowid lab testing)','https://www.drugsdata.org/','Lab results for tested street samples'],['DEA Drug Fact Sheets','https://www.dea.gov/factsheets','Federal descriptions, street names and schedules'],['NIDA','https://nida.nih.gov/','National Institute on Drug Abuse research and drug facts'],['PubChem','https://pubchem.ncbi.nlm.nih.gov/','Chemical structures, identifiers and toxicity'],['UNODC','https://www.unodc.org/','UN drug and crime data, World Drug Report'],['Wikipedia: Psychoactive drug','https://en.wikipedia.org/wiki/Psychoactive_drug','Overview and drug classes']]},
+ {name:'OSINT', instr:"Channel: OSINT. Open-source investigation. Plan searches step by step, name the exact tools and sources to use, and explain what each result does and doesn't prove. Keep a clean chain for every finding: source, date found, how it ties to the subject. Verify before linking identities and rate confidence as confirmed, likely or unconfirmed. Stick to public information.",
+  src:[['OSINT Framework','https://osintframework.com/','Tool map by category'],['Bellingcat Online Investigations Toolkit','https://bellingcat.gitbook.io/toolkit','Vetted tools with how-to notes'],['Bellingcat how-to guides','https://www.bellingcat.com/category/resources/how-tos/','Step-by-step investigation methods'],['IntelTechniques','https://inteltechniques.com/','Michael Bazzell OSINT tools and resources'],['Awesome OSINT','https://github.com/jivoi/awesome-osint','Large curated list of OSINT tools']]},
+ {name:'Cybercrime', instr:"Channel: Cybercrime. Intrusions, malware, account takeover, phishing, ransomware and crypto theft. Map activity to MITRE ATT&CK techniques, pull indicators into clean lists (IPs, domains, hashes, emails, wallets), build timelines from logs, and write detections (Sigma, KQL, SPL) when useful. Keep observed evidence separate from inference.",
+  src:[['MITRE ATT&CK','https://attack.mitre.org/','Adversary tactics and techniques'],['CISA Known Exploited Vulnerabilities','https://www.cisa.gov/known-exploited-vulnerabilities-catalog','CVEs exploited in the wild'],['abuse.ch','https://abuse.ch/','Malware, botnet and URL threat feeds'],['VirusTotal','https://www.virustotal.com/','File, URL, domain and IP reputation'],['FBI IC3','https://www.ic3.gov/','Cybercrime complaints and PSAs']]},
+ {name:'Money laundering', instr:"Channel: Money laundering. Follow the money: structuring, shell companies, trade-based laundering, crypto mixing, money mules. Lay out entities, accounts and transfers as a flow, name the typologies (FinCEN and FATF terms), and list the sanctions and company-registry checks to run. Mark every link as documented or inferred.",
+  src:[['FATF','https://www.fatf-gafi.org/','Global AML standards, typologies and country reports'],['FinCEN Advisories','https://www.fincen.gov/resources/advisoriesbulletinsfact-sheets/advisories','Red-flag advisories by scheme'],['OFAC Sanctions Search','https://sanctionssearch.ofac.treas.gov/','US sanctions list lookup'],['OpenCorporates','https://opencorporates.com/','Company records across jurisdictions'],['ICIJ Offshore Leaks','https://offshoreleaks.icij.org/','Offshore entities from the Panama and Pandora papers']]}
+];
+if(!S.chanSeeded){
+  CHANNELS.forEach((c, i) => S.projects.push({id:'ch' + Date.now() + i, name:c.name, instr:c.instr, files:[], src:c.src.map(([n,u,d]) => ({n,u,d}))}));
+  S.chanSeeded = 1; try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+}
+const okUrl = u => /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(u);
 const app = $('app'), thread = $('thread'), scroll = $('scroll'), q = $('q'), send = $('send');
 const chat = () => S.chats.find(c => c.id === S.cur);
 const proj = id => S.projects.find(p => p.id === id);
@@ -510,7 +531,7 @@ function renderThread(keep){
   app.classList.toggle('convo', !!c);
   app.classList.toggle('casemode', !!(c && c.caseMode));
   app.classList.toggle('inproj', !c && !!S.curProj);
-  $('projtag').textContent = S.curProj ? 'New chat in ' + (proj(S.curProj)||{}).name : '';
+  $('projtag').innerHTML = S.curProj ? `# ${esc((proj(S.curProj)||{}).name || '')} · <u>instructions and sources</u>` : '';
   $('title').textContent = c ? c.title : 'New chat';
   const off = c ? c.model === 'big' || c.msgs.some(x => x.off) : S.nextModel === 'big';
   const pill = $('pill'); pill.className = 'pill' + (off ? ' off' : '');
@@ -531,7 +552,7 @@ function renderDrawer(){
   const pins = list.filter(c => c.pinned);
   $('pins').innerHTML = pins.map(row).join(''); $('pinlab').style.display = pins.length ? '' : 'none';
   $('rec').innerHTML = list.filter(c => !c.pinned).map(row).join('') || '<div class="empty">No chats match.</div>';
-  $('projs').innerHTML = S.projects.map(p => `<div class="r"><button class="it" data-proj="${p.id}">${ic('folder')}<span class="t">${esc(p.name)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${S.chats.filter(c => c.proj === p.id).length}</span></button></div>`).join('');
+  $('projs').innerHTML = S.projects.map(p => `<div class="r"><button class="it" data-proj="${p.id}"><span class="hash">#</span><span class="t">${esc(p.name)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${S.chats.filter(c => c.proj === p.id).length}</span></button></div>`).join('');
 }
 
 /* ---------- drawer / sheets / panel ---------- */
@@ -554,7 +575,8 @@ function chatMenu(id){
   sheet(`<div class="sh">${esc(c.title)}</div>
     <button class="opt" data-s="rename" data-id="${id}">${ic('edit')}Rename</button>
     <button class="opt" data-s="pin" data-id="${id}">${ic('pin')}${c.pinned ? 'Unpin' : 'Pin to top'}</button>
-    <button class="opt" data-s="move" data-id="${id}">${ic('folder')}<span>Move to project<small>${c.proj ? 'Now in ' + esc(proj(c.proj).name) : 'Not in a project'}</small></span></button>
+    ${c.proj && proj(c.proj) ? `<button class="opt" data-s="chanset" data-p="${c.proj}"><span class="hash">#</span><span>${esc(proj(c.proj).name)} channel<small>Instructions and sources</small></span></button>` : ''}
+    <button class="opt" data-s="move" data-id="${id}">${ic('folder')}<span>Move to channel<small>${c.proj ? 'Now in ' + esc(proj(c.proj).name) : 'Not in a channel'}</small></span></button>
     <button class="opt" data-s="case" data-id="${id}">${ic('case')}<span>Case file mode<small>Tag and number every message, export a packet</small></span><span class="sw ${c.caseMode ? 'on' : ''}"></span></button>
     ${c.caseMode ? `<button class="opt" data-s="index" data-id="${id}">${ic('tag')}Case index and export</button>` : ''}`);
 }
@@ -565,19 +587,24 @@ function renameSheet(id){
 }
 function moveSheet(id){
   const c = S.chats.find(x => x.id === id);
-  sheet(`<div class="sh">Move to project</div>${S.projects.map(p => `<button class="opt" data-s="domove" data-id="${id}" data-p="${p.id}">${ic('folder')}${esc(p.name)}${c.proj === p.id ? `<span class="ck">${ic('check')}</span>` : ''}</button>`).join('')}<button class="opt" data-s="domove" data-id="${id}" data-p="">${ic('x')}No project${!c.proj ? `<span class="ck">${ic('check')}</span>` : ''}</button>`);
+  sheet(`<div class="sh">Move to channel</div>${S.projects.map(p => `<button class="opt" data-s="domove" data-id="${id}" data-p="${p.id}">${ic('folder')}${esc(p.name)}${c.proj === p.id ? `<span class="ck">${ic('check')}</span>` : ''}</button>`).join('')}<button class="opt" data-s="domove" data-id="${id}" data-p="">${ic('x')}No project${!c.proj ? `<span class="ck">${ic('check')}</span>` : ''}</button>`);
 }
 function projSheet(pid){
-  const p = proj(pid), chats = S.chats.filter(c => c.proj === pid);
-  sheet(`<div class="sh">Project</div>
-    <input class="field" id="pname" value="${esc(p.name)}" aria-label="Project name">
-    <div class="note">Instructions Li follows in every chat in this project</div>
-    <textarea class="field" id="pinstr" aria-label="Project instructions">${esc(p.instr)}</textarea>
+  const p = proj(pid); if(!p) return; p.src = p.src || []; const chats = S.chats.filter(c => c.proj === pid).sort((x, y) => y.t - x.t);
+  sheet(`<div class="sh"># ${esc(p.name)}</div>
+    <div class="btns" style="justify-content:flex-start;margin:0 0 12px"><button class="btn dark" data-s="projchat" data-p="${pid}">New chat in ${esc(p.name)}</button></div>
+    <div class="note">Name</div><input class="field" id="pname" value="${esc(p.name)}" aria-label="Channel name">
+    <div class="note">Instructions Li follows in every chat in this channel. Add to them any time.</div>
+    <textarea class="field" id="pinstr" style="min-height:150px" aria-label="Channel instructions">${esc(p.instr)}</textarea>
+    <div class="lab" style="padding:0 4px 6px">Reference sources <span style="font-size:12px;color:var(--dim)">${p.src.length}</span></div>
+    ${p.src.map((s, i) => `<div class="prow"><div class="who"><b><a href="${esc(s.u)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${esc(s.n)}</a></b><small>${esc(s.d || s.u)}</small></div><div class="pa"><button class="btn mini" data-s="srcdel" data-p="${pid}" data-i="${i}" aria-label="Remove ${esc(s.n)}">Remove</button></div></div>`).join('') || '<div class="empty">No sources yet</div>'}
+    <div style="display:flex;gap:6px;margin-top:10px"><input class="field" id="srcn" placeholder="Name" style="margin:0;flex:1"><input class="field" id="srcu" type="url" placeholder="https://" style="margin:0;flex:1.4"></div>
+    <div class="btns" style="justify-content:flex-start;margin:6px 0 14px"><button class="btn" data-s="srcadd" data-p="${pid}">+ Add source</button></div>
     <div class="lab" style="padding:0 4px 6px">Files <button data-s="pfile" data-p="${pid}">+ Add file</button></div>
     <div class="files" style="justify-content:flex-start;max-width:100%;margin-bottom:12px">${fileChips(p.files) || '<span class="empty">No files yet</span>'}</div>
     <div class="lab" style="padding:0 4px 4px">Chats</div>
     <div class="list">${chats.map(c => `<div class="r"><button class="it" data-s="open" data-id="${c.id}">${esc(c.title)}</button></div>`).join('') || '<div class="empty">No chats yet</div>'}</div>
-    <div class="btns" style="margin-top:14px"><button class="btn" data-s="saveproj" data-p="${pid}">Save</button><button class="btn dark" data-s="projchat" data-p="${pid}">New chat here</button></div>`);
+    <div class="btns" style="margin-top:14px"><button class="btn" data-s="projdel" data-p="${pid}" style="margin-right:auto;color:#b3271a">Delete channel</button><button class="btn dark" data-s="saveproj" data-p="${pid}">Save</button></div>`);
 }
 function memSheet(){
   sheet(`<div class="sh">Memory</div>
@@ -644,21 +671,26 @@ $('sheetIn').addEventListener('click', e => {
   else if(s === 'dorename'){ const v = $('rn').value.trim(); if(v) c.title = v; closeS(); renderThread(true); save(); }
   else if(s === 'pin'){ c.pinned = !c.pinned; closeS(); renderDrawer(); save(); toast(c.pinned ? 'Pinned' : 'Unpinned'); }
   else if(s === 'move') moveSheet(id);
-  else if(s === 'domove'){ c.proj = b.dataset.p || null; closeS(); renderDrawer(); save(); toast(c.proj ? 'Moved to ' + proj(c.proj).name : 'Removed from project'); }
+  else if(s === 'domove'){ c.proj = b.dataset.p || null; closeS(); renderDrawer(); save(); toast(c.proj ? 'Moved to ' + proj(c.proj).name : 'Removed from channel'); }
   else if(s === 'case'){ c.caseMode = !c.caseMode; b.querySelector('.sw').classList.toggle('on', c.caseMode); renderThread(true); save(); chatMenu(id); }
   else if(s === 'index') indexSheet(id);
   else if(s === 'goto'){ openChat(id); requestAnimationFrame(() => { const el = thread.querySelector(`[data-i="${b.dataset.i}"]`); el && el.scrollIntoView({block:'center'}); }); }
   else if(s === 'packet'){ closeS(); openPanel('Case packet · ' + c.title, null, packet(c)); }
   else if(s === 'copypacket') copy(packet(c));
   else if(s === 'open') openChat(id);
-  else if(s === 'saveproj'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; save(); renderDrawer(); toast('Project saved'); }
+  else if(s === 'saveproj'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; save(); renderDrawer(); renderThread(true); toast('Channel saved'); projSheet(p.id); }
   else if(s === 'projchat'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; newChat(p.id); }
   else if(s === 'pfile'){ fileTarget = b.dataset.p; $('fproj').click(); }
+  else if(s === 'srcdel'){ const p = proj(b.dataset.p); p.instr = $('pinstr').value; p.src.splice(+b.dataset.i, 1); save(); projSheet(p.id); }
+  else if(s === 'srcadd'){ const p = proj(b.dataset.p), n = $('srcn').value.trim(); let u = $('srcu').value.trim(); if(u && !/^https?:\/\//i.test(u)) u = 'https://' + u; if(!n || !okUrl(u)){ toast('Add a name and a full web address'); return; } p.instr = $('pinstr').value; p.src.push({n, u, d:''}); save(); projSheet(p.id); toast('Source added'); }
+  else if(s === 'projdel'){ const p = proj(b.dataset.p); sheet(`<div class="sh">Delete the ${esc(p.name)} channel?</div><div class="warnbox">Its instructions and sources go away. Its chats stay, moved out to Recents.</div><div class="btns"><button class="btn" data-s="projback" data-p="${p.id}">Keep it</button><button class="btn warn" data-s="projdodel" data-p="${p.id}">Delete channel</button></div>`); }
+  else if(s === 'projback' || s === 'chanset') projSheet(b.dataset.p);
+  else if(s === 'projdodel'){ const id = b.dataset.p; S.chats.forEach(c => { if(c.proj === id) c.proj = null; }); S.projects = S.projects.filter(p => p.id !== id); if(S.curProj === id) S.curProj = null; closeS(); renderThread(); save(); toast('Channel deleted'); }
   else if(s === 'memtoggle'){ S.mem = !S.mem; b.querySelector('.sw').classList.toggle('on', S.mem); renderThread(true); save(); }
   else if(s === 'memview') memSheet();
   else if(s === 'nobig') toast('No outside model is set up, everything stays on your box');
   else if(s === 'signout') signOut();
-  else if(s === 'wipe'){ sheet(`<div class="sh">Delete every chat on this device?</div><div class="warnbox">This clears chats, projects and case files saved in this browser. It can't be undone.</div><div class="btns"><button class="btn" data-s="close">Keep them</button><button class="btn warn" data-s="dowipe">Delete all</button></div>`); }
+  else if(s === 'wipe'){ sheet(`<div class="sh">Delete every chat on this device?</div><div class="warnbox">This clears chats, channels and case files saved in this browser. It can't be undone.</div><div class="btns"><button class="btn" data-s="close">Keep them</button><button class="btn warn" data-s="dowipe">Delete all</button></div>`); }
   else if(s === 'dowipe'){ S = seed(); closeS(); renderThread(); save(); toast('Chats deleted'); }
   else if(s === 'model'){ if(b.dataset.m === 'big'){ offSheet(); } else { const ch = chat(); if(ch) ch.model = 'local'; else S.nextModel = 'local'; closeS(); renderThread(true); save(); } }
   else if(s === 'gobig'){ const ch = chat(); if(ch) ch.model = 'big'; else S.nextModel = 'big'; closeS(); renderThread(true); save(); toast('This chat now uses an off-box model'); }
@@ -670,9 +702,10 @@ $('sheetIn').addEventListener('keydown', e => { if(e.target.id === 'rn' && e.key
 
 $('drawer').addEventListener('click', e => {
   const o = e.target.closest('[data-open]'), mn = e.target.closest('[data-menu]'), pj = e.target.closest('[data-proj]');
-  if(o) openChat(o.dataset.open); else if(mn) chatMenu(mn.dataset.menu); else if(pj){ closeD(); projSheet(pj.dataset.proj); }
+  if(o) openChat(o.dataset.open); else if(mn) chatMenu(mn.dataset.menu); else if(pj){ closeD(); newChat(pj.dataset.proj); }
 });
-$('newproj').onclick = () => { const p = {id:'p'+Date.now(), name:'Untitled project', instr:'', files:[]}; S.projects.push(p); save(); closeD(); projSheet(p.id); };
+$('projtag').onclick = () => S.curProj && projSheet(S.curProj);
+$('newproj').onclick = () => { const p = {id:'p'+Date.now(), name:'New channel', instr:'', files:[], src:[]}; S.projects.push(p); save(); closeD(); projSheet(p.id); };
 $('dmem').onclick = () => { closeD(); memSheet(); };
 $('dcase').onclick = () => { closeD(); caseList(); };
 $('settings').onclick = () => { closeD(); settingsSheet(); };
@@ -748,7 +781,7 @@ const api = (path, opt = {}) => fetch(path, {...opt, credentials:'same-origin', 
 function sysPrompt(c){
   const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box. Nothing you see leaves this machine. Write like a sharp friend texting back: lead with the answer in the first sentence, keep it short (two to five sentences or a tight list) unless asked for depth, no headings, no sections explaining why you answered the way you did, no filler. Use a code block only for code. Never use em dashes.`];
   if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
-  if(p){ if(p.instr) parts.push(`Project "${p.name}" instructions:\n${p.instr}`); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
+  if(p){ if(p.instr) parts.push(`Channel "${p.name}" instructions:\n${p.instr}`); if((p.src || []).length) parts.push(`Reference sources for this channel. Point the user to them by name and link when they help. You can't open them from here, so never claim you checked one:\n` + p.src.map(s => `- ${s.n} (${s.u})${s.d ? ': ' + s.d : ''}`).join('\n')); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
   if(talkOn) parts.push('This reply will be spoken out loud on a voice call. Talk like a person on the phone: one to three short, natural sentences, no lists, no markdown, no code unless asked. Sound warm and direct.');
   if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
   return parts.join('\n\n');
