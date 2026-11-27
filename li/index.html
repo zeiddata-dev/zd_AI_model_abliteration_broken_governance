@@ -680,7 +680,7 @@ q.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !mat
 const token = () => localStorage.token || '';
 const api = (path, opt = {}) => fetch(path, {...opt, credentials:'same-origin', headers:{'Content-Type':'application/json', ...(token() ? {Authorization:'Bearer ' + token()} : {}), ...(opt.headers || {})}});
 function sysPrompt(c){
-  const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box. Nothing you see leaves this machine. Answer first, then explain. Never use em dashes.`];
+  const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box. Nothing you see leaves this machine. Write like a sharp friend texting back: lead with the answer in the first sentence, keep it short (two to five sentences or a tight list) unless asked for depth, no headings, no sections explaining why you answered the way you did, no filler. Use a code block only for code. Never use em dashes.`];
   if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
   if(p){ if(p.instr) parts.push(`Project "${p.name}" instructions:\n${p.instr}`); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
   if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
