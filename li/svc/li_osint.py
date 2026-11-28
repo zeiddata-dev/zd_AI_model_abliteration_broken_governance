@@ -73,17 +73,24 @@ async def crtsh(d):
     return {'certificates': len(rows), 'names': sorted(names)[:300], 'first_seen': first, 'last_seen': last}
 
 async def wayback(target, exact=False):
-    p = {'url': target, 'output': 'json', 'fl': 'timestamp,original,statuscode', 'collapse': 'timestamp:4', 'limit': '200'}
-    if not exact: p['matchType'] = 'host'
-    try:
-        r = await http.get('https://web.archive.org/cdx/search/cdx', params=p, timeout=30)
-        rows = r.json()[1:] if r.text.strip() else []
-    except Exception:
+    base = {'url': target, 'output': 'json', 'fl': 'timestamp,original,statuscode', 'collapse': 'timestamp:4', 'limit': '200'}
+    # Whole-host searches time out on big sites, so fall back to the exact address.
+    tries = [('exact address', base, 35)] if exact else [('whole site', {**base, 'matchType': 'host'}, 15), ('home page only', base, 35)]
+    rows, scope = None, None
+    for label, p, tmo in tries:
+        try:
+            r = await http.get('https://web.archive.org/cdx/search/cdx', params=p, timeout=tmo)
+            if r.status_code != 200: continue
+            rows, scope = (r.json()[1:] if r.text.strip() else []), label
+            break
+        except Exception:
+            continue
+    if rows is None:
         return {'error': 'Wayback Machine did not answer'}
     years = {}
     for ts, orig, st in rows: years[ts[:4]] = years.get(ts[:4], 0) + 1
     snaps = [{'when': ts, 'url': f'https://web.archive.org/web/{ts}/{orig}'} for ts, orig, st in rows]
-    return {'yearly_captures': len(rows), 'first': snaps[0] if snaps else None, 'last': snaps[-1] if snaps else None,
+    return {'scope': scope, 'yearly_captures': len(rows), 'first': snaps[0] if snaps else None, 'last': snaps[-1] if snaps else None,
             'by_year': years, 'snapshots': snaps[-12:]}
 
 @app.get('/health')

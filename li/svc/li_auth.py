@@ -418,7 +418,8 @@ def summarize(kind, target, d):
             f"A {', '.join(dn.get('A', [])[:4])}" if dn.get('A') else '', f"{len(c.get('names', []))} names in {c.get('certificates', 0)} certificates" if 'names' in c else '',
             f"archived since {(wb.get('first') or {}).get('when', '')[:4]}" if wb.get('first') else ''] if x) or 'no records found'
     if kind == 'ip': return f"{(d.get('rdap') or {}).get('name') or 'unknown network'}, {(d.get('rdap') or {}).get('country') or '?'}; reverse DNS {d.get('reverse_dns') or 'none'}"
-    if kind == 'wayback': return f"{d.get('yearly_captures', 0)} yearly captures, first {((d.get('first') or {}).get('when') or '')[:8]}, last {((d.get('last') or {}).get('when') or '')[:8]}"
+    if kind == 'wayback' and d.get('error'): return d['error']
+    if kind == 'wayback': return f"{d.get('scope') or ''}: {d.get('yearly_captures', 0)} yearly captures, first {((d.get('first') or {}).get('when') or '')[:8]}, last {((d.get('last') or {}).get('when') or '')[:8]}"
     if kind == 'username': return f"{len(d.get('found', []))} public profiles answered out of {d.get('checked_sites')} sites checked"
     if kind == 'harvest': return f"{len(d.get('subdomains', []))} subdomains, {len(d.get('emails', []))} emails"
     if kind == 'exif': return ', '.join(f'{k}: {v}' for k, v in (d.get('summary') or {}).items()) + (f"; GPS {d['gps']['lat']:.5f},{d['gps']['lon']:.5f}" if d.get('gps') else '; no GPS')
