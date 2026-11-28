@@ -26,11 +26,45 @@ You do not need all three. Layer one is enough to use it yourself. Add two if
 someone else needs API access. Add three if that someone would rather have a chat
 box than write curl commands.
 
+## The 27B with a chat window (current build)
+
+The 20B was slow and the answers were thin, so the current build is
+`huihui_ai/Qwen3.8-abliterated:27b-q4_K_M` (18 GB, Apache 2.0, from huihui-ai)
+with Open WebUI as a typed chat window. One script does all of it:
+`setup_qwen27b_chat.sh`. It installs the NVIDIA driver and Docker only if they
+are missing, puts Ollama and the chat app on localhost only, pulls the model, and
+proves it answers. No public ports, no login screen, no proxy. You get in through
+an SSH tunnel, which is the lock.
+
+1. Launch a g6.xlarge on the Deep Learning Base OSS Nvidia Driver GPU AMI
+   (Ubuntu), 100 GB gp3, key pair named `gpu-box-key`, security group with SSH
+   from your IP only. Pin an Elastic IP.
+2. On your Mac, run `mac_tunnel_setup.sh` once and type the Elastic IP when it
+   asks. It adds an `ssh heretic` shortcut that also opens the tunnel. On
+   Windows, `ssh_her.ps1` now forwards the chat port too.
+3. `ssh heretic`, then on the box:
+
+       cd /tmp && curl -fsSL https://raw.githubusercontent.com/zeiddata-dev/zd_ai_model_abliteration_broken_governance/main/setup_qwen27b_chat.sh -o /tmp/setup_qwen27b_chat.sh && bash /tmp/setup_qwen27b_chat.sh
+
+   Wait for `DECISION=READY`. The 18 GB download is the slow part.
+4. Leave that SSH session open and go to http://localhost:3000 in your browser.
+   Type. That's it.
+
+Fallback with no browser: `ollama run huihui_ai/Qwen3.8-abliterated:27b-q4_K_M`
+on the box. Ollama runs with a 32K context, flash attention and a q8_0 KV cache
+so the whole thing stays on the L4. If `DECISION=READY_CHECK_GPU` shows up, the
+model spilled onto the CPU: set `CTX=16384` at the top of the script and re-run.
+
+The older layers below (`setup_proxy.sh`, `chat-worker/`) still point at the 20B
+model name. Change `MODEL` in them before using them with this build.
+
 ## Files
 
-- `setup_heretic.sh` model install and smoke test, runs on the box
+- `setup_qwen27b_chat.sh` current build: 27B model plus Open WebUI chat window, runs on the box
+- `mac_tunnel_setup.sh` one-time Mac setup for the `ssh heretic` tunnel shortcut
+- `setup_heretic.sh` model install and smoke test, runs on the box (original 20B build)
 - `setup_proxy.sh` authenticated HTTPS proxy in front of Ollama, runs on the box
-- `ssh_her.ps1` PowerShell shortcut that SSHes in and opens the tunnel in one word
+- `ssh_her.ps1` PowerShell shortcut that SSHes in and opens the tunnels (chat on 3000, API on 11434) in one word
 - `USAGE.md` how to actually use the thing, plus a plain-English take on what
   abliteration is
 - `HANDOFF.md` the copy-paste kit you send to whoever gets API access

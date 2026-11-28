@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#f6f4ef">
+<title>Li</title>
+<link rel="icon" id="fav" href="data:,">
+<link href="/li/vendor/fonts.css" rel="stylesheet">
+<style>
+/*
+VOICE  calm, private, a little playful; a phone app first
+IDEA   Claude-style mobile chat that lives on your own GPU box
+PICTURE the rust 3D Zeid Z: idle on home, spins with live tok/s
+COLOUR warm paper #f6f4ef, ink #262522, rust accent, amber only for off-box
+TYPE   Source Serif 4 for Li's words, system sans for UI, JetBrains Mono for code
+*/
+:root{
+  --bg:#f6f4ef; --card:#fbfaf7; --soft:#eeebe4; --soft2:#e7e3da; --line:#e4e0d7; --ink:#262522; --ink2:#5d5a54; --dim:#9a968e;
+  --pink:#D76233; --rust:#9c3a16; --black:#1d1c1a; --home:#3f6b4f; --amber:#b7791f; --amberbg:#fbefd9;
+  --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",system-ui,sans-serif;
+  --serif:"Source Serif 4",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+body{overflow:hidden}
+button,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
+svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.shell{display:flex;height:100dvh}
+.app{flex:1;display:flex;flex-direction:column;position:relative;max-width:760px;margin:0 auto;width:100%}
+
+/* top bar */
+.top{position:absolute;inset:0 0 auto 0;z-index:5;display:flex;align-items:flex-start;justify-content:space-between;padding:calc(10px + var(--safe-t)) 14px 22px;background:linear-gradient(var(--bg) 78%,rgba(246,244,239,0))}
+.top .r{display:flex;gap:8px}
+.ib.spk.on{background:var(--rust);border-color:var(--rust);color:#fff}
+.ib.spk.talking{animation:spkp 1.1s ease-in-out infinite}
+@keyframes spkp{50%{box-shadow:0 0 0 6px rgba(156,58,22,.18)}}
+.ib{width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:grid;place-items:center;box-shadow:0 1px 2px rgba(0,0,0,.04);color:var(--ink)}
+.mid{position:absolute;left:50%;transform:translateX(-50%);top:calc(10px + var(--safe-t));display:flex;flex-direction:column;align-items:center;gap:4px;max-width:54%}
+.title{border:0;background:none;font-size:15px;font-weight:500;color:var(--ink2);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:2px 6px;border-radius:8px;opacity:0}
+.convo .title{opacity:1}
+.pill{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 9px;border-radius:12px;font-size:12px;font-weight:500;border:0;background:#e5eee7;color:var(--home)}
+.pill svg.i{width:13px;height:13px}
+.pill.off{background:var(--amberbg);color:var(--amber)}
+.pill .case{display:none}
+.casemode .pill .case{display:inline;margin-left:4px;padding-left:6px;border-left:1px solid currentColor;opacity:.8}
+.more{display:none}.convo .more{display:grid}
+
+/* scroll */
+.scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:96px 18px 24px;scrollbar-width:none}
+.home{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding-bottom:30px}
+.greet{font-family:var(--serif);font-size:30px;font-weight:400;letter-spacing:-.01em;margin:18px 0 0}
+.sub{font-size:14px;color:var(--dim);margin-top:8px}
+.hash{width:16px;text-align:center;color:var(--dim);font-weight:600;flex:none}
+.projtag{cursor:pointer;margin-top:14px;font-size:13px;color:var(--ink2);background:var(--soft);border-radius:10px;padding:6px 10px;display:none}
+.inproj .hash{width:16px;text-align:center;color:var(--dim);font-weight:600;flex:none}
+.projtag{cursor:pointer;display:inline-block}
+.convo .home{display:none}
+.thread{display:none}.convo .thread{display:block}
+
+/* messages */
+.u{display:flex;flex-direction:column;align-items:flex-end;margin:18px 0}
+.u .b{max-width:84%;background:var(--soft);border-radius:20px;padding:10px 15px;font-size:16px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+.u .uacts{display:flex;gap:2px;margin-top:2px;opacity:.85}
+.u .edit{width:100%;max-width:84%;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:10px}
+.u .edit textarea{width:100%;border:0;background:none;resize:none;outline:none;font-size:16px;line-height:1.45;min-height:60px}
+.u .edit .row{justify-content:flex-end}
+.btn{height:36px;border-radius:18px;border:1px solid var(--line);background:var(--card);padding:0 14px;font-size:14px;font-weight:500}
+.btn.dark{background:var(--black);border-color:var(--black);color:#fff}
+.btn.warn{background:var(--amber);border-color:var(--amber);color:#fff}
+.files{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;margin-bottom:6px;max-width:84%}
+.fc{display:inline-flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px 6px 6px;font-size:13px;max-width:220px}
+.fc img{width:34px;height:34px;object-fit:cover;border-radius:8px}
+.fc .ft{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:10px;font-weight:600;color:#fff;background:var(--ink2);flex:none}
+.fc .ft.pdf{background:#b3271a}.fc .ft.sheet{background:#2f7a4a}.fc .ft.img{background:#5b6e8c}
+.fc b{font-weight:500;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fc small{color:var(--dim)}
+.fc .x{border:0;background:none;color:var(--dim);padding:0 2px;font-size:16px}
+
+.a{margin:18px 0 22px;font-family:var(--serif);font-size:17.5px;line-height:1.6}
+.a p{margin:0 0 12px}.a ul{margin:0 0 12px;padding-left:22px}.a li{margin:0 0 8px}.a b{font-weight:600}
+.mem{display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);font-size:12.5px;color:var(--ink2);background:var(--soft);border:0;border-radius:12px;padding:4px 10px;margin-bottom:8px}
+.mem svg.i{width:13px;height:13px}
+.memlist{font-family:var(--sans);font-size:13px;color:var(--ink2);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:-2px 0 10px}
+.memlist div{padding:3px 0}
+.code{font-family:var(--sans);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin:4px 0 14px;background:var(--card)}
+.code .h{display:flex;align-items:center;gap:6px;padding:6px 6px 6px 12px;font-size:12.5px;color:var(--ink2);border-bottom:1px solid var(--line)}
+.code .h span{margin-right:auto;font-family:var(--mono)}
+.code .h button{height:30px;border:0;border-radius:8px;background:none;padding:0 9px;font-size:12.5px;display:inline-flex;align-items:center;gap:5px;color:var(--ink)}
+.code .h button:active{background:var(--soft)}
+.code pre{margin:0;padding:12px;font:12.5px/1.55 var(--mono);overflow-x:auto;color:#3d3a35;max-height:220px}
+.acts{display:flex;align-items:center;gap:2px;margin-top:4px;font-family:var(--sans);color:var(--dim)}
+.acts button{min-width:32px;height:32px;border:0;background:none;border-radius:8px;display:grid;place-items:center;color:var(--dim)}
+.acts button:active{background:var(--soft)}
+.acts button.on{color:var(--rust)}
+.ver{display:inline-flex;align-items:center;font-size:12.5px;gap:0}
+.ver button{min-width:26px}
+.where{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
+.where .off{color:var(--amber);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;font-family:var(--sans)}
+.tag{font-size:11.5px;color:var(--rust);background:#f6e7df;border-radius:8px;padding:2px 7px;white-space:nowrap}
+.tag.ex{color:var(--ink2);background:var(--soft);font-family:var(--mono)}
+.u .tags{justify-content:flex-end;max-width:84%}
+.think{display:flex;align-items:center;gap:10px;margin:18px 0;color:var(--ink2);font-size:15px}
+.think .lbl{background:linear-gradient(90deg,var(--dim),var(--ink),var(--dim));background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 1.6s linear infinite}
+.tps{font:12px var(--mono);color:var(--dim)}
+.caret::after{content:"";display:inline-block;width:8px;height:16px;margin-left:2px;vertical-align:-2px;background:var(--pink);border-radius:2px;animation:blink 1s steps(1) infinite}
+.jump{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(140px + var(--safe-b));z-index:4;width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);display:none;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.jump.on{display:grid}
+
+/* composer */
+.dock{padding:6px 12px calc(12px + var(--safe-b));background:linear-gradient(rgba(246,244,239,0),var(--bg) 30%)}
+.comp{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:10px 12px 10px;box-shadow:0 4px 18px rgba(40,30,20,.07)}
+.comp .files{justify-content:flex-start;max-width:100%;margin:0 0 6px}
+.comp textarea{display:block;width:100%;border:0;background:none;resize:none;outline:none;font-size:16px;line-height:1.4;padding:6px 6px 10px;max-height:160px}
+.comp textarea::placeholder{color:var(--dim)}
+.row{display:flex;align-items:center;gap:8px}
+.round{width:38px;height:38px;border-radius:50%;border:0;background:var(--soft);display:grid;place-items:center;flex:none}
+.chip{height:38px;border:0;border-radius:19px;background:var(--soft);padding:0 12px;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.chip i{font-style:normal;color:var(--dim)}
+.chip.webc svg.i,.chip.toolc svg.i{width:16px;height:16px}
+.comp .row{overflow-x:auto;scrollbar-width:none}
+.tmsg{font-family:var(--sans);border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 12px;margin:12px 0}
+.tmsg .th{display:flex;align-items:center;gap:8px;font-size:14px}.tmsg .th svg.i{width:16px;height:16px;color:var(--rust)}
+.tmsg .th span{color:var(--ink2);font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmsg .ts{font-size:14px;margin:6px 0 4px;line-height:1.45}.tmsg .te{font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+.tmsg .acts{gap:6px;margin-top:8px}
+.conn{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:0 0 10px;background:var(--bg)}
+.conn .ch{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.evraw{font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:40dvh;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.chip.webc.on{background:#e4efe7;color:var(--home)}
+.wsrc{font-family:var(--sans);margin:10px 0 2px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:6px}
+.wsrc .wl{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim);padding:4px 6px 6px}
+.wsrc .wl svg.i{width:14px;height:14px}
+.wsrc a{display:flex;align-items:center;gap:8px;padding:7px 6px;border-radius:10px;color:var(--ink);text-decoration:none;font-size:13.5px}
+.wsrc a:active,.wsrc a:hover{background:var(--soft)}
+.wsrc .n{flex:none;width:20px;height:20px;border-radius:6px;background:var(--soft);display:grid;place-items:center;font-size:11.5px;color:var(--ink2)}
+.wsrc .t{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wsrc .d{flex:none;color:var(--dim);font-size:12px;max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip.off i{color:var(--amber);font-weight:500}
+.send{margin-left:auto;width:38px;height:38px;border-radius:50%;border:0;background:var(--black);color:#fff;display:grid;place-items:center;flex:none}
+.send svg.i{stroke-width:2.2}
+.send .stop{display:none;width:12px;height:12px;background:#fff;border-radius:2px}
+.busy .send .stop{display:block}.busy .send svg{display:none}
+.mic{margin-left:auto}
+.hasText .mic,.busy .mic{display:none}
+.send.hide{display:none}
+.fine{text-align:center;font-size:11.5px;color:var(--dim);margin-top:8px}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(20,18,15,.3);opacity:0;pointer-events:none;transition:opacity .25s;z-index:20}
+.dopen .scrim.d,.sopen .scrim.s{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;bottom:0;left:0;width:min(86vw,340px);background:#f1eee8;z-index:21;transform:translateX(-102%);transition:transform .28s cubic-bezier(.3,.7,.2,1);display:flex;flex-direction:column;padding:calc(12px + var(--safe-t)) 10px calc(12px + var(--safe-b));box-shadow:8px 0 30px rgba(0,0,0,.08)}
+.dopen .drawer{transform:none}
+.dh{display:flex;align-items:center;gap:10px;padding:4px 8px 12px;font-family:var(--serif);font-size:24px}
+.search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:0 12px;color:var(--dim);margin-bottom:6px}
+.search input{border:0;background:none;outline:none;height:42px;width:100%;font-size:16px;color:var(--ink)}
+.nav button,.list button.it{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;padding:10px 10px;border-radius:12px;font-size:15.5px;text-align:left}
+.nav .new{color:#a3401a;font-weight:500}
+.nav button:active,.list .it:active{background:var(--soft)}
+.lab{font-size:12.5px;color:var(--dim);padding:12px 10px 4px;display:flex;align-items:center;justify-content:space-between}
+.lab button{border:0;background:none;color:var(--ink2);font-size:12.5px}
+.dscroll{flex:1;overflow-y:auto;scrollbar-width:none}
+.list .r{display:flex;align-items:center;border-radius:12px}
+.list .r.cur{background:var(--soft)}
+.list .it{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list .it .t{overflow:hidden;text-overflow:ellipsis}
+.list .it svg.i{width:15px;height:15px;color:var(--dim)}
+.list .dots{width:36px;height:36px;border:0;background:none;color:var(--dim);border-radius:10px;flex:none;display:grid;place-items:center}
+.empty{padding:6px 10px;color:var(--dim);font-size:14px}
+.me{display:flex;align-items:center;gap:10px;padding:12px 8px 0;border-top:1px solid var(--line)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--black);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:600}
+.me b{font-weight:500;font-size:15px}.me small{display:block;color:var(--dim);font-size:12.5px}
+
+/* bottom sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;margin:0 auto;max-width:560px;z-index:31;background:var(--card);border-radius:22px 22px 0 0;padding:8px 16px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .26s cubic-bezier(.3,.7,.2,1);max-height:86dvh;display:flex;flex-direction:column;box-shadow:0 -8px 30px rgba(0,0,0,.1)}
+.scrim.s{z-index:30}
+.sopen .sheet{transform:none}
+/* sign-in: the regular bottom sheet over a soft blur, can't be swiped away until you're in */
+.locked .scrim.s{background:rgba(246,244,239,.55);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.locked .sheet .grab{visibility:hidden}
+.authhead{display:flex;flex-direction:column;align-items:center;text-align:center;margin:2px 0 14px}
+.authhead .zm{width:54px;height:54px;margin-bottom:8px}
+.authhead h2{font-family:var(--serif);font-weight:400;font-size:26px;margin:0}
+.blurb{font-size:13.5px;line-height:1.5;color:var(--ink2);margin:8px 4px 0;max-width:420px}
+.blurb b{font-weight:600;color:var(--ink)}
+.fid{width:100%;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:15px;font-weight:500}
+.fid svg.i{width:20px;height:20px}
+.or{display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12.5px;margin:12px 2px}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
+.alink{display:block;width:100%;border:0;background:none;color:var(--rust);font-size:14px;padding:12px 0 2px;text-align:center}
+.seg{display:flex;background:var(--soft);border-radius:12px;padding:3px;margin:0 0 12px}
+.seg button{flex:1;height:34px;border:0;border-radius:9px;background:none;font-size:14px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.prow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line)}
+.av{width:34px;height:34px;border-radius:50%;background:var(--soft2);display:grid;place-items:center;font-weight:600;font-size:14px;flex:none;color:var(--ink2)}
+.prow .who{flex:1;min-width:0}
+.prow .who b{font-weight:500;font-size:15px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .who small{color:var(--dim);font-size:12.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .pa{display:flex;gap:6px;flex:none}
+.badge{font-size:11.5px;border-radius:8px;padding:2px 7px;background:var(--soft);color:var(--ink2);white-space:nowrap}
+.badge.admin{background:#f6e7df;color:var(--rust)}.badge.pending,.badge.waiting{background:var(--amberbg);color:#6b4510}.badge.used{background:#e4efe7;color:var(--home)}
+.btn.mini{height:30px;border-radius:15px;font-size:13px;padding:0 11px}
+.linkbox{font:13px var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 12px;word-break:break-all;margin:4px 0 10px;user-select:all;-webkit-user-select:all}
+.bigcode{font:600 22px var(--mono);letter-spacing:.08em;text-align:center;margin:4px 0 10px}
+.vrow{display:flex;gap:8px;flex-wrap:wrap;margin:2px 4px 12px}
+.vrow button{height:34px;border-radius:17px;border:1px solid var(--line);background:var(--card);padding:0 12px;font-size:13.5px}
+.vrow button.on{border-color:var(--rust);color:var(--rust)}
+#authf .field{margin-bottom:10px}
+#authf .btn.dark,.fid{width:100%;height:48px;border-radius:24px;font-size:15px}
+#authf .btns{margin-top:6px}
+.grab{width:38px;height:5px;border-radius:3px;background:var(--soft2);margin:0 auto 10px}
+.sh{font-size:17px;font-weight:600;margin:4px 4px 10px}
+.sbody{overflow-y:auto;scrollbar-width:none}
+.opt{width:100%;display:flex;align-items:center;gap:12px;border:0;background:none;padding:13px 6px;border-radius:12px;font-size:16px;text-align:left}
+.opt:active{background:var(--soft)}
+.opt small{display:block;color:var(--dim);font-size:13px;margin-top:1px}
+.opt .ck{margin-left:auto;color:var(--rust)}
+.opt.danger{color:#b3271a}
+.sw{margin-left:auto;width:44px;height:26px;border-radius:13px;background:var(--soft2);position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .2s}
+.sw.on{background:var(--rust)}.sw.on::after{transform:translateX(18px)}
+.field{display:block;width:100%;border:1px solid var(--line);background:var(--bg);border-radius:12px;padding:11px 12px;font-size:16px;outline:none;margin:4px 0 12px}
+textarea.field{resize:vertical;min-height:96px;line-height:1.45}
+.note{font-size:13px;color:var(--dim);margin:0 4px 12px;line-height:1.45}
+.warnbox{background:var(--amberbg);color:#6b4510;border-radius:14px;padding:12px 14px;font-size:14px;line-height:1.45;margin-bottom:14px}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.memitem{display:flex;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);font-size:15px}
+.memitem svg.i{color:var(--dim);width:15px;height:15px;margin-top:3px}
+.memitem small{display:block;color:var(--dim);font-size:12.5px}
+.sheet .ex{display:block;width:100%;text-align:left;border:0;background:none;border-bottom:1px solid var(--line);padding:10px 4px;font-size:14px}
+.sheet .ex b{font-family:var(--mono);font-weight:400;color:var(--rust);margin-right:6px}
+.sheet .ex .q{color:var(--ink2);display:block;margin:2px 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* side panel: preview + case packet */
+.panel{position:fixed;z-index:25;background:var(--card);display:flex;flex-direction:column;inset:0;transform:translateY(102%);transition:transform .28s cubic-bezier(.3,.7,.2,1)}
+.popen .panel{transform:none}
+.ph{display:flex;align-items:center;gap:8px;padding:calc(10px + var(--safe-t)) 12px 10px;border-bottom:1px solid var(--line)}
+.ph b{font-weight:600;font-size:15px;margin-right:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:flex;background:var(--soft);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;border-radius:8px;height:30px;padding:0 12px;font-size:13.5px;color:var(--ink2)}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pb{flex:1;position:relative;overflow:auto;background:#fff}
+.pb iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
+.pb pre{margin:0;padding:14px;font:13px/1.6 var(--mono);white-space:pre-wrap;color:#3d3a35}
+.dcolb{display:none}
+/* wide screens: Claude-style layout. Chats sidebar docked on the left (collapsible), chat in the middle,
+   preview panel docks on the right and pushes the chat over instead of covering it */
+@media (min-width:900px){
+  :root{--sbw:288px}
+  .shell{padding-left:var(--sbw);transition:padding .28s cubic-bezier(.3,.7,.2,1)}
+  .drawer{width:var(--sbw);transform:none;box-shadow:none;border-right:1px solid var(--line);z-index:6}
+  .scrim.d{display:none}
+  .dcolb{display:grid;margin-left:auto;border:0;background:none;box-shadow:none;width:36px;height:36px}
+  body:not(.dcol) #menu{visibility:hidden}
+  .dcol .drawer{transform:translateX(-102%)}
+  .dcol .shell{padding-left:0}
+  .top{padding-left:18px;padding-right:18px}
+}
+@media (min-width:980px){
+  :root{--pw:min(46vw,700px)}
+  .panel{inset:0 0 0 auto;width:var(--pw);transform:translateX(102%);border-left:1px solid var(--line);box-shadow:-8px 0 30px rgba(0,0,0,.05)}
+  .popen .shell{padding-right:var(--pw)}
+}
+
+/* talk mode */
+.talk{position:fixed;inset:0;z-index:40;background:radial-gradient(120% 80% at 50% 40%,#2a1a12,#120c09 70%);color:#f4ece6;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(18px + var(--safe-t)) 20px calc(26px + var(--safe-b))}
+.talking .talk{display:flex}
+.talk .tl{font-size:13px;color:#c9b8ad;display:flex;align-items:center;gap:6px}
+.talk .zm.talkz{width:190px;height:190px}
+.talk .state{font-family:var(--serif);font-size:26px;margin-top:22px;text-align:center}
+.talk .cap{min-height:52px;max-width:340px;text-align:center;color:#d9c9bf;font-size:16px;line-height:1.45;margin-top:10px}
+.wave{display:flex;gap:4px;height:28px;align-items:center;margin-top:16px}
+.wave i{width:4px;border-radius:2px;background:#e0874a;height:6px;animation:wv 1s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}.wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.4s}.wave i:nth-child(6){animation-delay:.5s}.wave i:nth-child(7){animation-delay:.6s}
+.talk .tb{display:flex;gap:14px}
+.talk .tb button{width:58px;height:58px;border-radius:50%;border:0;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff}
+.talk .tb .end{background:#c8402a}
+.talk .tb svg.i{width:22px;height:22px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:calc(150px + var(--safe-b));transform:translate(-50%,20px);background:var(--black);color:#fff;font-size:14px;padding:10px 14px;border-radius:12px;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:88vw}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* Zeid mark */
+.zm{display:inline-grid;place-items:center;width:28px;height:28px;flex:none;position:relative}
+.zm>*{width:100%;height:100%;display:block}
+.zm svg{overflow:visible;filter:drop-shadow(0 1px 1px rgba(60,20,5,.35))}
+.zm.big{width:132px;height:132px}
+.zm.mini{width:22px;height:22px}
+.dh .zm{width:30px;height:30px}
+.think .zm.mini{width:26px;height:26px}
+.zm.spin svg{animation:yspin 1.4s linear infinite,rustcycle 2.8s linear infinite}
+.zm.idle svg{animation:sway 6s ease-in-out infinite}
+@keyframes yspin{to{transform:rotateY(360deg)}}
+@keyframes sway{50%{transform:rotateY(22deg)}}
+@keyframes rustcycle{50%{filter:hue-rotate(14deg) brightness(1.15)}}
+@keyframes blink{50%{opacity:0}}
+@keyframes shine{to{background-position:-200% 0}}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}}
+@keyframes wv{50%{height:26px}}
+.u,.a{animation:rise .25s ease-out}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+<div class="app" id="app">
+  <header class="top">
+    <button class="ib" id="menu" aria-label="Open menu"></button>
+    <div class="mid">
+      <button class="title" id="title" aria-label="Rename chat">New chat</button>
+      <button class="pill" id="pill" aria-label="Where this chat runs"></button>
+    </div>
+    <div class="r">
+      <button class="ib spk" id="spk" aria-label="Read replies out loud" aria-pressed="true"></button>
+      <button class="ib" id="newc" aria-label="New chat"></button>
+      <button class="ib more" id="more" aria-label="Chat options"></button>
+    </div>
+  </header>
+
+  <main class="scroll" id="scroll">
+    <section class="home">
+      <div class="zm big idle" role="img" aria-label="Zeid Data logo"></div>
+      <h1 class="greet" id="greet">Hello</h1>
+      <div class="sub">Li · running on your own GPU</div>
+      <div class="projtag" id="projtag"></div>
+    </section>
+    <section class="thread" id="thread" aria-live="polite"></section>
+  </main>
+
+  <button class="jump" id="jump" aria-label="Jump to latest"></button>
+
+  <footer class="dock">
+    <form class="comp" id="form">
+      <div class="files" id="att"></div>
+      <label for="q" style="position:absolute;left:-9999px">Message Li</label>
+      <textarea id="q" rows="1" placeholder="Talk to Li" autocomplete="off"></textarea>
+      <div class="row">
+        <button type="button" class="round" id="plus" aria-label="Add photos or files"></button>
+        <button type="button" class="chip" id="model">Li 27B <i>local</i></button>
+        <button type="button" class="chip webc" id="webc" aria-pressed="true">Web</button>
+        <button type="button" class="chip toolc" id="toolc" style="display:none">Tools</button>
+        <button type="button" class="chip toolc" id="casec" style="display:none">Case</button>
+        <button type="button" class="round mic" id="mic" aria-label="Talk mode"></button>
+        <button type="submit" class="send hide" id="send" aria-label="Send"><span class="stop"></span></button>
+      </div>
+    </form>
+    <div class="fine">Li runs on your own GPU. Chats are saved in this browser.</div>
+  </footer>
+</div>
+</div>
+
+<div class="scrim d" id="dscrim"></div>
+<nav class="drawer" id="drawer" aria-label="Chats">
+  <div class="dh"><span class="zm" aria-hidden="true"></span>Li<button class="ib dcolb" id="dcol" aria-label="Close sidebar"></button></div>
+  <label class="search"><span id="sicon"></span><input id="find" type="search" placeholder="Search chats" autocomplete="off"></label>
+  <div class="nav">
+    <button class="new" id="dnew"></button>
+    <button id="dmem"></button>
+    <button id="dcase"></button>
+  </div>
+  <div class="dscroll">
+    <div class="lab">Channels <button id="newproj">+ New</button></div>
+    <div class="list" id="projs"></div>
+    <div class="lab" id="pinlab">Pinned</div>
+    <div class="list" id="pins"></div>
+    <div class="lab">Recents</div>
+    <div class="list" id="rec"></div>
+  </div>
+  <div class="me"><div class="av" id="meAv">L</div><div><b id="meName">Signing in</b><small>Your box · L4 GPU</small></div>
+    <button class="ib" id="settings" style="margin-left:auto;border:0;background:none;box-shadow:none" aria-label="Settings"></button>
+  </div>
+</nav>
+
+<div class="scrim s" id="sscrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"><div class="grab"></div><div class="sbody" id="sheetIn"></div></div>
+
+<aside class="panel" id="panel" aria-label="Preview">
+  <div class="ph"><b id="ptitle">Preview</b>
+    <div class="seg" id="pseg"><button data-v="preview" class="on">Preview</button><button data-v="code">Code</button></div>
+    <button class="ib" id="pcopy" aria-label="Copy"></button>
+    <button class="ib" id="pclose" aria-label="Close panel"></button>
+  </div>
+  <div class="pb" id="pbody"></div>
+</aside>
+
+<div class="talk" id="talk" role="dialog" aria-label="Talk mode">
+  <div class="tl" id="tl"></div>
+  <div style="display:flex;flex-direction:column;align-items:center">
+    <div class="zm talkz spin" aria-hidden="true"></div>
+    <div class="state" id="tstate">Listening</div>
+    <div class="wave" id="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cap" id="tcap"></div>
+  </div>
+  <div class="tb"><button id="tmute" aria-label="Mute"></button><button class="end" id="tend" aria-label="End talk mode"></button></div>
+</div>
+
+<input type="file" id="fimg" accept="image/*" multiple hidden>
+<input type="file" id="ffile" accept=".pdf,.csv,.xlsx,.xls,.txt,.md,.docx,.json" multiple hidden>
+<input type="file" id="fproj" multiple hidden>
+<input type="file" id="fexif" accept="image/*,.heic,.heif,.tif,.tiff,.dng" hidden>
+<div class="toast" id="toast" role="status"></div>
+<script>
+{
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const P = {
+  menu:'<path d="M4 8h16M4 15h10"/>', newc:'<path d="M12 20c4.6 0 8-3.3 8-7.6S16.6 5 12 5 4 8.1 4 12.4c0 1.6.5 3 1.3 4.2L4.5 20l3.7-1c1.1.6 2.4 1 3.8 1Z"/><path d="M12 9.5v6M9 12.5h6"/>',
+  more:'<circle cx="6" cy="12" r=".7"/><circle cx="12" cy="12" r=".7"/><circle cx="18" cy="12" r=".7"/>',
+  house:'<path d="M4 11.5 12 5l8 6.5V20h-5v-5h-6v5H4z"/>', out:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>', mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',
+  up:'<path d="M12 19V5M6 11l6-6 6 6"/>', down:'<path d="M12 5v14M6 13l6 6 6-6"/>', search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  folder:'<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  brain:'<path d="M12 3a6 6 0 0 0-3.5 10.9V17h7v-3.1A6 6 0 0 0 12 3ZM9.5 21h5"/>',
+  case:'<rect x="3.5" y="7" width="17" height="12.5" rx="2"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3.5 12.5h17"/>',
+  copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>',
+  good:'<path d="M7 11v9H4v-9h3Zm0 0 4-7c1.7 0 2.6 1.2 2.2 2.8L12.6 10H18a2 2 0 0 1 2 2.3l-1.1 6A2 2 0 0 1 16.9 20H7"/>',
+  bad:'<path d="M7 13V4H4v9h3Zm0 0 4 7c1.7 0 2.6-1.2 2.2-2.8L12.6 14H18a2 2 0 0 0 2-2.3l-1.1-6A2 2 0 0 0 16.9 4H7"/>',
+  retry:'<path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5"/>', edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
+  l:'<path d="m14 6-6 6 6 6"/>', r:'<path d="m10 6 6 6-6 6"/>', x:'<path d="M6 6l12 12M18 6 6 18"/>', pin:'<path d="M9 4h6l-1 5 3 3H7l3-3zM12 15v5"/>',
+  eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+  lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>', img:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="9.5" r="1.6"/><path d="m4 17 5-4.5 4 3.5 3-2.5 4 3.5"/>',
+  file:'<path d="M6 3.5h8l4 4v13H6z"/><path d="M14 3.5v4h4"/>', gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+  check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', export:'<path d="M12 15V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/>', end:'<path d="M3.5 14.5c5-5 12-5 17 0l-2.5 2.5-3-1.5v-2.5a10 10 0 0 0-6 0V15.5l-3 1.5z"/>',
+  globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.2 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.2-3.6-8.5S9.6 5.8 12 3.5Z"/>',
+  side:'<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M9.5 4.5v15"/>',
+  mute:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
+  face:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9.5v1M15 9.5v1M12 9.5v3.5h-1M9.5 15.5a3.5 3.5 0 0 0 5 0"/>',
+  speak:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/>',
+  hush:'<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="m16.5 9.5 5 5M21.5 9.5l-5 5"/>',
+  people:'<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.6a3 3 0 0 1 0 5.8M17.5 14.2A5.5 5.5 0 0 1 20.5 19"/>', tag:'<path d="M3.5 12.5V4.5h8l9 9-8 8z"/><circle cx="8" cy="9" r="1.3"/>'
+};
+const ic = (n, cls='') => `<svg class="i ${cls}" viewBox="0 0 24 24" aria-hidden="true">${P[n]}</svg>`;
+[['menu','side'],['newc','newc'],['more','more'],['plus','plus'],['mic','mic'],['jump','down'],['sicon','search'],['settings','gear'],['pclose','x'],['pcopy','copy'],['tend','end'],['tmute','mute']].forEach(([id,n]) => $(id).innerHTML = ic(n));
+$('send').insertAdjacentHTML('afterbegin', ic('up'));
+const spkPaint = () => { const b = $('spk'); b.innerHTML = ic(S.voice.on ? 'speak' : 'hush'); b.classList.toggle('on', S.voice.on); b.setAttribute('aria-pressed', S.voice.on); b.setAttribute('aria-label', S.voice.on ? 'Li reads replies out loud. Tap to mute' : 'Li is muted. Tap to hear replies'); };
+$('dnew').innerHTML = ic('plus') + 'New chat';
+$('dmem').innerHTML = ic('brain') + 'Memory <span style="margin-left:auto;font-size:12px;color:var(--dim)">starter notes</span>';
+$('dcase').innerHTML = ic('case') + 'Case files';
+$('tl').innerHTML = ic('lock') + 'Talk mode · Lithium Live voice';
+
+/* ---------- live state: chats, projects and settings live in this browser ---------- */
+let MEM = []; /* starter notes load from /li/notes.json on the box, never from this file */
+const KEY = 'li-live-v1';
+const seed = () => ({v:1, cur:null, curProj:null, mem:true, nextModel:'local', projects:[], chats:[], voice:{on:true, name:'af_heart', v:2}});
+let S;
+try { S = JSON.parse(localStorage.getItem(KEY)); } catch(e){}
+if(!S || S.v !== 1) S = seed();
+if(!S.voice || S.voice.v !== 2) S.voice = {on:true, name:(S.voice && S.voice.name) || 'af_heart', v:2};
+let ME = {name:'', first:'', id:'', role:''}, MODEL = '';
+const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(S, (k,v) => (k==='url' || k==='data') ? undefined : v)); }catch(e){ toast('Storage is full, older chats may not save'); } };
+
+
+/* ---------- channels: one per case-file category, each with its own instructions and reference sources ---------- */
+const CHANNELS = [
+ {name:'Fraud', instr:"Channel: Fraud. Treat every chat here as part of a fraud case file: check fraud, wire and payment fraud, identity theft, elder fraud, insurance and billing fraud, scams. Pull out who, what, when, how much and which account or instrument, and lay the money trail out in order. Name the red flags you see (altered or counterfeit checks, mismatched payee, rush requests, changed payment details). Keep what the documents show separate from what you infer, and say which is which. Point to the right place to report or look something up when it helps. Keep dates, amounts and names exactly as written.",
+  src:[['FBI IC3 (Internet Crime Complaint Center)','https://www.ic3.gov/','FBI complaint intake and annual internet crime reports'],['FTC ReportFraud','https://reportfraud.ftc.gov/','Where consumer fraud is reported in the US'],['ACFE Fraud Resources','https://www.acfe.com/fraud-resources','Association of Certified Fraud Examiners guides and fraud tree'],['US Postal Inspection Service','https://www.uspis.gov/','Mail theft and check fraud'],['FinCEN','https://www.fincen.gov/','US Treasury financial crimes unit, alerts and SAR guidance'],['CFPB','https://www.consumerfinance.gov/','Consumer finance complaints and scam guides'],['Wikipedia: Cheque fraud','https://en.wikipedia.org/wiki/Cheque_fraud','Check fraud types: kiting, washing, forgery']]},
+ {name:'Drugs', instr:"Channel: Drugs. Case work involving drugs and controlled substances. Give accurate pharmacology: what the substance is, street and chemical names, effects, documented dosing ranges, interactions, overdose signs and legal schedule (federal, and Texas when it matters). Help identify substances from descriptions, slang, packaging, pill imprints and lab results. Lead with the safety facts when someone's health could be at risk. Say which source a fact comes from when it matters.",
+  src:[['Erowid','https://erowid.org/','Substance vaults: effects, dosing, experience reports'],['DrugsData (Erowid lab testing)','https://www.drugsdata.org/','Lab results for tested street samples'],['DEA Drug Fact Sheets','https://www.dea.gov/factsheets','Federal descriptions, street names and schedules'],['NIDA','https://nida.nih.gov/','National Institute on Drug Abuse research and drug facts'],['PubChem','https://pubchem.ncbi.nlm.nih.gov/','Chemical structures, identifiers and toxicity'],['UNODC','https://www.unodc.org/','UN drug and crime data, World Drug Report'],['Wikipedia: Psychoactive drug','https://en.wikipedia.org/wiki/Psychoactive_drug','Overview and drug classes']]},
+ {name:'OSINT', kind:'osint', instr:"Channel: OSINT. Open-source investigation. Plan searches step by step, name the exact tools and sources to use, and explain what each result does and doesn't prove. Keep a clean chain for every finding: source, date found, how it ties to the subject. Verify before linking identities and rate confidence as confirmed, likely or unconfirmed. Stick to public information.",
+  src:[['OSINT Framework','https://osintframework.com/','Tool map by category'],['Bellingcat Online Investigations Toolkit','https://bellingcat.gitbook.io/toolkit','Vetted tools with how-to notes'],['Bellingcat how-to guides','https://www.bellingcat.com/category/resources/how-tos/','Step-by-step investigation methods'],['IntelTechniques','https://inteltechniques.com/','Michael Bazzell OSINT tools and resources'],['Awesome OSINT','https://github.com/jivoi/awesome-osint','Large curated list of OSINT tools']]},
+ {name:'Cybercrime', instr:"Channel: Cybercrime. Intrusions, malware, account takeover, phishing, ransomware and crypto theft. Map activity to MITRE ATT&CK techniques, pull indicators into clean lists (IPs, domains, hashes, emails, wallets), build timelines from logs, and write detections (Sigma, KQL, SPL) when useful. Keep observed evidence separate from inference.",
+  src:[['MITRE ATT&CK','https://attack.mitre.org/','Adversary tactics and techniques'],['CISA Known Exploited Vulnerabilities','https://www.cisa.gov/known-exploited-vulnerabilities-catalog','CVEs exploited in the wild'],['abuse.ch','https://abuse.ch/','Malware, botnet and URL threat feeds'],['VirusTotal','https://www.virustotal.com/','File, URL, domain and IP reputation'],['FBI IC3','https://www.ic3.gov/','Cybercrime complaints and PSAs']]},
+ {name:'Money laundering', instr:"Channel: Money laundering. Follow the money: structuring, shell companies, trade-based laundering, crypto mixing, money mules. Lay out entities, accounts and transfers as a flow, name the typologies (FinCEN and FATF terms), and list the sanctions and company-registry checks to run. Mark every link as documented or inferred.",
+  src:[['FATF','https://www.fatf-gafi.org/','Global AML standards, typologies and country reports'],['FinCEN Advisories','https://www.fincen.gov/resources/advisoriesbulletinsfact-sheets/advisories','Red-flag advisories by scheme'],['OFAC Sanctions Search','https://sanctionssearch.ofac.treas.gov/','US sanctions list lookup'],['OpenCorporates','https://opencorporates.com/','Company records across jurisdictions'],['ICIJ Offshore Leaks','https://offshoreleaks.icij.org/','Offshore entities from the Panama and Pandora papers']]},
+ {name:'Legal', kind:'legal', instr:"Channel: Legal. Legal research for case work: case law, federal and Texas statutes and regulations, court dockets and filings. Quote the exact language and give the full citation (case name, court, date, reporter or docket number; statute or CFR section). Separate what a source says from your reading of it. Flag jurisdiction (federal, Texas, county), whether something is binding or persuasive, and whether a rule may have changed since. This is research, not legal advice; say when a lawyer should look at it. Paid sources like PACER cost per page: say before suggesting a paid pull.",
+  src:[['CourtListener','https://www.courtlistener.com/','Free case law, judges, oral arguments (Free Law Project)'],['RECAP Archive','https://www.courtlistener.com/recap/','Free copies of PACER dockets and filings'],['PACER','https://pacer.uscourts.gov/','Official federal court records, paid per page'],['Judyrecords','https://www.judyrecords.com/','Search across state and county court records'],['Caselaw Access Project','https://case.law/','Harvard\'s scanned US case law, free bulk data'],['Justia Law','https://law.justia.com/','Free case law, codes and regulations'],['Cornell LII','https://www.law.cornell.edu/','US Code, CFR and plain-English legal reference'],['GovInfo','https://www.govinfo.gov/','Official federal publications, US Code, court opinions'],['Federal Register','https://www.federalregister.gov/','Federal rules, proposed rules and notices'],['eCFR','https://www.ecfr.gov/','Current Code of Federal Regulations'],['Texas Statutes','https://statutes.capitol.texas.gov/','Texas codes, including the Penal Code'],['re:SearchTX','https://research.txcourts.gov/','Texas state court case records (free account)'],['Texas appellate case search','https://search.txcourts.gov/','Texas Supreme Court and courts of appeals dockets'],['Dallas County courts portal','https://courtsportal.dallascounty.org/DALLASPROD','Dallas County civil, criminal and family case search'],['Tarrant County','https://www.tarrantcountytx.gov/','Tarrant County courts and records'],['Collin County','https://www.collincountytx.gov/','Collin County courts and records']]}
+];
+const mkChan = (c, i) => ({id:'ch' + Date.now() + i, name:c.name, kind:c.kind, instr:c.instr, files:[], src:c.src.map(([n,u,d]) => ({n,u,d}))});
+if(!S.chanSeeded){ CHANNELS.forEach((c, i) => S.projects.push(mkChan(c, i))); S.chanSeeded = 2; }
+if(S.chanSeeded === 1){ const lg = CHANNELS.find(c => c.kind === 'legal'); if(!S.projects.some(p => /^legal$/i.test(p.name))) S.projects.push(mkChan(lg, 9)); S.projects.forEach(p => { if(/^osint$/i.test(p.name) && !p.kind) p.kind = 'osint'; }); S.chanSeeded = 2; }
+try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+const okUrl = u => /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(u);
+const app = $('app'), thread = $('thread'), scroll = $('scroll'), q = $('q'), send = $('send');
+const chat = () => S.chats.find(c => c.id === S.cur);
+const proj = id => S.projects.find(p => p.id === id);
+const kb = s => s > 1e6 ? (s/1e6).toFixed(1)+' MB' : Math.max(1, Math.round(s/1e3))+' KB';
+const kind = n => /\.(png|jpe?g|gif|webp|heic)$/i.test(n) ? 'img' : /\.pdf$/i.test(n) ? 'pdf' : /\.(csv|xlsx?|numbers)$/i.test(n) ? 'sheet' : 'doc';
+const hm = ts => new Date(ts).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+const day = ts => new Date(ts).toLocaleDateString([], {month:'short', day:'numeric'});
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 2200); }
+const copy = t => navigator.clipboard && navigator.clipboard.writeText(t).then(() => toast('Copied'), () => toast("Couldn't copy here"));
+
+/* ---------- case file auto-tagger ---------- */
+const MONTHS = 'Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec';
+function tagsFor(text, files){
+  const t = text || '', out = [];
+  (t.match(new RegExp('\\b('+MONTHS+')[a-z]*\\.? \\d{1,2}\\b','g')) || []).forEach(d => out.push(d.replace(/^(\w{3})\w*\.?/, '$1')));
+  (t.match(/\$\d[\d,]*(\.\d+)?/g) || []).forEach(a => out.push(a));
+  [['email','email'],['receipt','receipt'],['invoice','invoice'],['photo','photos'],['lease','lease'],['deposit','deposit'],['call','call'],['contract','contract']].forEach(([k,v]) => { if(new RegExp(k,'i').test(t)) out.push(v); });
+  (files||[]).forEach(f => out.push(f.k === 'pdf' ? 'document' : f.k === 'img' ? 'photos' : 'attachment'));
+  return [...new Set(out)].slice(0, 6);
+}
+const plain = msg => msg.r === 'u' ? msg.t : String((msg.v[msg.vi] || {}).md || '');
+
+/* ---------- markdown (escaped first, then a small safe subset) ---------- */
+function inl(t){
+  let x = esc(t);
+  x = x.replace(/`([^`]+)`/g, '<code>$1</code>');
+  x = x.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<i>$2</i>');
+  x = x.replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  return x;
+}
+function parseMd(md){
+  const out = [], lines = String(md || '').replace(/\r/g, '').split('\n');
+  let i = 0, para = [];
+  const flush = () => { if(para.length){ out.push({p: inl(para.join(' '))}); para = []; } };
+  while(i < lines.length){
+    const l = lines[i];
+    const f = l.match(/^\s*```\s*([\w.+-]*)\s*$/);
+    if(f){
+      flush(); const lang = (f[1] || '').toLowerCase(), buf = []; i++;
+      while(i < lines.length && !/^\s*```\s*$/.test(lines[i])) buf.push(lines[i++]);
+      i++; const src = buf.join('\n');
+      const html = lang === 'html' || /^\s*<!doctype html|^\s*<html/i.test(src);
+      out.push({code:{lang: html ? 'html' : lang, title: html ? 'page.html' : (lang || 'code'), src}}); continue;
+    }
+    if(/^\s*$/.test(l)){ flush(); i++; continue; }
+    const h = l.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ flush(); out.push({h: inl(h[2])}); i++; continue; }
+    if(/^\s*([-*+]|\d+[.)])\s+/.test(l)){
+      flush(); const ordered = /^\s*\d/.test(l), items = [];
+      while(i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])){ items.push(inl(lines[i].replace(/^\s*([-*+]|\d+[.)])\s+/, ''))); i++; }
+      out.push(ordered ? {ol:items} : {ul:items}); continue;
+    }
+    para.push(l); i++;
+  }
+  flush(); return out;
+}
+/* ---------- rendering ---------- */
+function blocks(bs){
+  return bs.map((b, i) => b.p != null ? `<p>${b.p}</p>` : b.h != null ? `<p><b>${b.h}</b></p>` : b.ol ? `<ol>${b.ol.map(x => `<li>${x}</li>`).join('')}</ol>` : b.ul ? `<ul>${b.ul.map(x => `<li>${x}</li>`).join('')}</ul>`
+    : b.code ? `<div class="code"><div class="h"><span>${esc(b.code.title)}</span>${b.code.lang === 'html' ? `<button data-act="preview" data-b="${i}">${ic('eye')}Preview</button>` : ''}<button data-act="copycode" data-b="${i}">${ic('copy')}Copy</button></div><pre>${esc(b.code.src)}</pre></div>` : '').join('');
+}
+function fileChips(files, removable){
+  return (files||[]).map((f, i) => `<span class="fc">${f.url ? `<img src="${esc(f.url)}" alt="">` : `<span class="ft ${f.k}">${f.k === 'img' ? 'IMG' : f.k === 'pdf' ? 'PDF' : f.k === 'sheet' ? 'XLS' : 'FILE'}</span>`}<span><b>${esc(f.n)}</b><small>${f.busy ? 'Reading on your box…' : f.skip === 'unread' ? 'Couldn\'t read this one' : f.skip === 'too big' ? 'Too big to read' : kb(f.s)}</small></span>${removable ? `<button type="button" class="x" data-rm="${i}" aria-label="Remove ${esc(f.n)}">×</button>` : ''}</span>`).join('');
+}
+function exLabel(c, idx){ let n = 0; for(let i = 0; i <= idx; i++) n++; return 'E-' + String(n).padStart(3,'0'); }
+function msgHTML(c, msg, i){
+  if(msg.r === 't') return `<div class="tmsg" data-i="${i}"><div class="th">${ic(msg.tool === 'exif' ? 'img' : TOOLDEF[msg.tool] && TOOLDEF[msg.tool].kind === 'legal' ? 'case' : 'search')}<b>${esc((TOOLDEF[msg.tool] || {}).label || msg.tool)}</b><span>${esc(msg.target)}</span></div>
+    ${msg.err ? `<div class="warnbox" style="margin:6px 0 0">${esc(msg.err)}</div>` : `<div class="ts">${esc(msg.summary || '')}</div><div class="te">${msg.ev ? `Saved as evidence E${msg.ev.id} · SHA-256 ${esc(msg.ev.sha256.slice(0, 12))}… · ${new Date(msg.ev.created_at * 1000).toLocaleString()}` : ''}</div>
+    <div class="acts">${msg.ev ? `<button class="btn mini" data-act="evopen" data-ev="${msg.ev.id}">Details</button>` : ''}<button class="btn mini" data-act="caseopen">Case workspace</button></div>`}</div>`;
+  const caseTags = c.caseMode ? `<div class="tags"><span class="tag ex">${exLabel(c, i)}</span>${tagsFor(plain(msg), msg.files).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
+  if(msg.r === 'u'){
+    if(msg.editing) return `<div class="u" data-i="${i}"><div class="edit"><textarea data-edit>${esc(msg.t)}</textarea><div class="row btns"><button class="btn" data-act="canceledit">Cancel</button><button class="btn dark" data-act="saveedit">Save and resend</button></div></div></div>`;
+    return `<div class="u" data-i="${i}">${msg.files && msg.files.length ? `<div class="files">${fileChips(msg.files)}</div>` : ''}<div class="b">${esc(msg.t)}</div>${caseTags}<div class="uacts acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="edit" aria-label="Edit">${ic('edit')}</button></div></div>`;
+  }
+  const n = msg.v.length, used = msg.mem && msg.mem.length && S.mem && MEM.length;
+  const where = msg.off ? `<span class="where"><span class="off">${ic('out')} Sent off-box</span></span>` : `<span class="where">${ic('house')} On your box${msg.tps ? ' · '+msg.tps.toFixed(1)+' tok/s' : ''}</span>`;
+  const errBox = msg.err ? `<div class="warnbox" style="margin:6px 0 4px;display:flex;gap:10px;align-items:center;justify-content:space-between"><span>${esc(msg.err)}</span><button class="btn dark" data-act="retry" style="flex:none">Retry</button></div>` : '';
+  return `<div class="a" data-i="${i}">${used ? `<button class="mem" data-act="mem">${ic('brain')}Used ${msg.mem.length} starter ${msg.mem.length > 1 ? 'notes' : 'note'}</button>${msg.showMem ? `<div class="memlist">${msg.mem.filter(k => MEM[k]).map(k => `<div>${ic('lock')} ${esc(MEM[k][0])}</div>`).join('')}</div>` : ''}` : ''}${blocks(parseMd(plain(msg)))}${msg.web && msg.web.length ? `<div class="wsrc"><div class="wl">${ic('globe')} Sources from the web</div>${msg.web.map(s => `<a href="${esc(s.u)}" target="_blank" rel="noopener noreferrer"><span class="n">${s.n}</span><span class="t">${esc(s.t || s.u)}</span><span class="d">${esc((()=>{try{return new URL(s.u).hostname.replace(/^www\./,'')}catch(e){return ''}})())}</span></a>`).join('')}</div>` : ''}${errBox}${caseTags}
+    <div class="acts"><button data-act="copy" aria-label="Copy">${ic('copy')}</button><button data-act="speak" aria-label="Read it out">${ic('speak')}</button><button data-act="good" class="${msg.rate === 1 ? 'on' : ''}" aria-label="Good reply">${ic('good')}</button><button data-act="bad" class="${msg.rate === -1 ? 'on' : ''}" aria-label="Bad reply">${ic('bad')}</button><button data-act="regen" aria-label="Regenerate">${ic('retry')}</button>${n > 1 ? `<span class="ver"><button data-act="vprev" aria-label="Previous version">${ic('l')}</button>${msg.vi+1}/${n}<button data-act="vnext" aria-label="Next version">${ic('r')}</button></span>` : ''}${where}<span class="zm mini" aria-hidden="true"></span></div></div>`;
+}
+function renderThread(keep){
+  const c = chat();
+  app.classList.toggle('convo', !!c); if(typeof paintWeb === 'function') paintWeb(); if(typeof paintTools === 'function') paintTools();
+  app.classList.toggle('casemode', !!(c && c.caseMode));
+  app.classList.toggle('inproj', !c && !!S.curProj);
+  $('projtag').innerHTML = S.curProj ? `# ${esc((proj(S.curProj)||{}).name || '')} · <u>instructions and sources</u>` : '';
+  $('title').textContent = c ? c.title : 'New chat';
+  const off = c ? c.model === 'big' || c.msgs.some(x => x.off) : S.nextModel === 'big';
+  const pill = $('pill'); pill.className = 'pill' + (off ? ' off' : '');
+  pill.innerHTML = off ? ic('out') + 'Off-box<span class="case">Case file</span>' : ic('house') + 'On your box<span class="case">Case file</span>';
+  const model = c ? c.model : S.nextModel; const mb = $('model');
+  mb.className = 'chip' + (model === 'big' ? ' off' : ''); mb.innerHTML = model === 'big' ? 'Bigger model <i>off-box</i>' : 'Li 27B <i>local</i>';
+  q.placeholder = c ? 'Reply to Li' : 'Talk to Li';
+  const top = scroll.scrollTop;
+  thread.innerHTML = c ? c.msgs.map((x, i) => msgHTML(c, x, i)).join('') : '';
+  if(keep) scroll.scrollTop = top; else requestAnimationFrame(() => scroll.scrollTop = scroll.scrollHeight);
+  renderDrawer();
+}
+function renderDrawer(){
+  const f = $('find').value.trim().toLowerCase();
+  const match = c => !f || c.title.toLowerCase().includes(f) || c.msgs.some(x => plain(x).toLowerCase().includes(f));
+  const row = c => `<div class="r ${c.id === S.cur ? 'cur' : ''}"><button class="it" data-open="${c.id}">${c.caseMode ? ic('case') : c.model === 'big' ? ic('out') : ''}<span class="t">${esc(c.title)}</span></button><button class="dots" data-menu="${c.id}" aria-label="Options for ${esc(c.title)}">${ic('more')}</button></div>`;
+  const list = [...S.chats].sort((a,b) => b.t - a.t).filter(match);
+  const pins = list.filter(c => c.pinned);
+  $('pins').innerHTML = pins.map(row).join(''); $('pinlab').style.display = pins.length ? '' : 'none';
+  $('rec').innerHTML = list.filter(c => !c.pinned).map(row).join('') || '<div class="empty">No chats match.</div>';
+  $('projs').innerHTML = S.projects.map(p => `<div class="r"><button class="it" data-proj="${p.id}"><span class="hash">#</span><span class="t">${esc(p.name)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${S.chats.filter(c => c.proj === p.id).length}</span></button></div>`).join('');
+}
+
+/* ---------- drawer / sheets / panel ---------- */
+const wide = () => matchMedia('(min-width:900px)').matches;
+const openD = () => { if(wide()){ document.body.classList.remove('dcol'); S.sideClosed = false; save(); } else document.body.classList.add('dopen'); renderDrawer(); };
+const closeD = () => document.body.classList.remove('dopen'); /* on wide screens the sidebar stays docked */
+if(S.sideClosed) document.body.classList.add('dcol');
+$('dcol').innerHTML = ic('side');
+$('dcol').onclick = () => { document.body.classList.add('dcol'); S.sideClosed = true; save(); };
+function sheet(html){ $('sheetIn').innerHTML = html; document.body.classList.add('sopen'); }
+const closeS = () => { if(!document.body.classList.contains('locked')) document.body.classList.remove('sopen'); };
+$('menu').onclick = openD; $('dscrim').onclick = closeD; $('sscrim').onclick = closeS;
+$('find').oninput = renderDrawer;
+function newChat(projId){ S.cur = null; S.curProj = projId || null; pending = []; renderAtt(); closeD(); closeS(); renderThread(); save(); q.focus({preventScroll:true}); }
+$('newc').onclick = () => newChat(); $('dnew').onclick = () => newChat();
+function openChat(id){ S.cur = id; S.curProj = null; closeD(); closeS(); renderThread(); save(); }
+
+function chatMenu(id){
+  const c = S.chats.find(x => x.id === id); if(!c) return;
+  sheet(`<div class="sh">${esc(c.title)}</div>
+    <button class="opt" data-s="rename" data-id="${id}">${ic('edit')}Rename</button>
+    <button class="opt" data-s="pin" data-id="${id}">${ic('pin')}${c.pinned ? 'Unpin' : 'Pin to top'}</button>
+    ${c.proj && proj(c.proj) ? `<button class="opt" data-s="chanset" data-p="${c.proj}"><span class="hash">#</span><span>${esc(proj(c.proj).name)} channel<small>Instructions and sources</small></span></button>` : ''}
+    <button class="opt" data-s="move" data-id="${id}">${ic('folder')}<span>Move to channel<small>${c.proj ? 'Now in ' + esc(proj(c.proj).name) : 'Not in a channel'}</small></span></button>
+    <button class="opt" data-s="case" data-id="${id}">${ic('case')}<span>Case file mode<small>Tag and number every message, export a packet</small></span><span class="sw ${c.caseMode ? 'on' : ''}"></span></button>
+    ${c.caseMode ? `<button class="opt" data-s="index" data-id="${id}">${ic('tag')}Case index and export</button>` : ''}`);
+}
+function renameSheet(id){
+  const c = S.chats.find(x => x.id === id);
+  sheet(`<div class="sh">Rename chat</div><input class="field" id="rn" value="${esc(c.title)}" maxlength="80"><div class="btns"><button class="btn" data-s="close">Cancel</button><button class="btn dark" data-s="dorename" data-id="${id}">Save</button></div>`);
+  setTimeout(() => { const i = $('rn'); if(i){ i.focus(); i.select(); } }, 280);
+}
+function moveSheet(id){
+  const c = S.chats.find(x => x.id === id);
+  sheet(`<div class="sh">Move to channel</div>${S.projects.map(p => `<button class="opt" data-s="domove" data-id="${id}" data-p="${p.id}">${ic('folder')}${esc(p.name)}${c.proj === p.id ? `<span class="ck">${ic('check')}</span>` : ''}</button>`).join('')}<button class="opt" data-s="domove" data-id="${id}" data-p="">${ic('x')}No project${!c.proj ? `<span class="ck">${ic('check')}</span>` : ''}</button>`);
+}
+function projSheet(pid){
+  const p = proj(pid); if(!p) return; p.src = p.src || []; const chats = S.chats.filter(c => c.proj === pid).sort((x, y) => y.t - x.t);
+  sheet(`<div class="sh"># ${esc(p.name)}</div>
+    <div class="btns" style="justify-content:flex-start;margin:0 0 12px"><button class="btn dark" data-s="projchat" data-p="${pid}">New chat in ${esc(p.name)}</button></div>
+    <div class="note">Name</div><input class="field" id="pname" value="${esc(p.name)}" aria-label="Channel name">
+    <div class="note">Instructions Li follows in every chat in this channel. Add to them any time.</div>
+    <textarea class="field" id="pinstr" style="min-height:150px" aria-label="Channel instructions">${esc(p.instr)}</textarea>
+    <div class="lab" style="padding:0 4px 6px">Reference sources <span style="font-size:12px;color:var(--dim)">${p.src.length}</span></div>
+    ${p.src.map((s, i) => `<div class="prow"><div class="who"><b><a href="${esc(s.u)}" target="_blank" rel="noopener noreferrer" style="color:inherit">${esc(s.n)}</a></b><small>${esc(s.d || s.u)}</small></div><div class="pa"><button class="btn mini" data-s="srcdel" data-p="${pid}" data-i="${i}" aria-label="Remove ${esc(s.n)}">Remove</button></div></div>`).join('') || '<div class="empty">No sources yet</div>'}
+    <div style="display:flex;gap:6px;margin-top:10px"><input class="field" id="srcn" placeholder="Name" style="margin:0;flex:1"><input class="field" id="srcu" type="url" placeholder="https://" style="margin:0;flex:1.4"></div>
+    <div class="btns" style="justify-content:flex-start;margin:6px 0 14px"><button class="btn" data-s="srcadd" data-p="${pid}">+ Add source</button></div>
+    <div class="lab" style="padding:0 4px 6px">Files <button data-s="pfile" data-p="${pid}">+ Add file</button></div>
+    <div class="files" style="justify-content:flex-start;max-width:100%;margin-bottom:12px">${fileChips(p.files) || '<span class="empty">No files yet</span>'}</div>
+    <div class="lab" style="padding:0 4px 4px">Chats</div>
+    <div class="list">${chats.map(c => `<div class="r"><button class="it" data-s="open" data-id="${c.id}">${esc(c.title)}</button></div>`).join('') || '<div class="empty">No chats yet</div>'}</div>
+    <div class="btns" style="margin-top:14px"><button class="btn" data-s="projdel" data-p="${pid}" style="margin-right:auto;color:#b3271a">Delete channel</button><button class="btn dark" data-s="saveproj" data-p="${pid}">Save</button></div>`);
+}
+function memSheet(){
+  sheet(`<div class="sh">Memory</div>
+    <div class="note">${ic('lock')} Lithium isn't connected yet. Until it is, Li reads these starter notes on your box at the start of each chat. Read-only.</div>
+    <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes in chats<small>Off means Li starts each chat blank</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
+    ${MEM.map(([t,k]) => `<div class="memitem">${ic('lock')}<div>${esc(t)}<small>${esc(k)}</small></div></div>`).join('') || '<div class="empty">No starter notes on this box yet.</div>'}`);
+}
+function caseList(){
+  const cs = S.chats.filter(c => c.caseMode);
+  sheet(`<div class="sh">Case files</div><div class="note">Chats in case file mode. Every message is numbered and tagged on your box.</div>
+    <div class="list">${cs.map(c => `<div class="r"><button class="it" data-s="index" data-id="${c.id}">${ic('case')}<span class="t">${esc(c.title)}</span><span style="margin-left:auto;font-size:12px;color:var(--dim)">${c.msgs.length} exhibits</span></button></div>`).join('') || '<div class="empty">No case files yet. Turn on case file mode from a chat\'s menu.</div>'}</div>`);
+}
+function indexSheet(id, filter){
+  const c = S.chats.find(x => x.id === id), f = (filter || '').toLowerCase();
+  const rows = c.msgs.map((x, i) => ({x, i, tags:tagsFor(plain(x), x.files)})).filter(o => !f || plain(o.x).toLowerCase().includes(f) || o.tags.some(t => t.toLowerCase().includes(f)));
+  sheet(`<div class="sh">Case index · ${esc(c.title)}</div>
+    <label class="search" style="margin:0 0 8px">${ic('search')}<input id="exf" type="search" placeholder="Search exhibits and tags" value="${esc(filter||'')}" data-id="${id}"></label>
+    ${rows.map(o => `<button class="ex" data-s="goto" data-id="${id}" data-i="${o.i}"><b>${exLabel(c, o.i)}</b>${o.x.r === 'u' ? (ME.first || 'You') : 'Li'} · ${day(o.x.ts)} ${hm(o.x.ts)}<span class="q">${esc(plain(o.x))}</span>${o.tags.map(t => `<span class="tag" style="margin-right:4px">${esc(t)}</span>`).join('')}</button>`).join('') || '<div class="empty">Nothing matches.</div>'}
+    <div class="btns" style="margin-top:14px"><button class="btn" data-s="copypacket" data-id="${id}">${'Copy packet'}</button><button class="btn dark" data-s="packet" data-id="${id}">Open packet</button></div>`);
+}
+function packet(c){
+  const off = c.msgs.some(x => x.off) || c.model === 'big';
+  let s = `# Case packet: ${c.title}\nExported ${new Date().toLocaleString()} from Li. ${off ? 'Includes replies that were sent off-box.' : 'Everything stayed on your box.'}\n\n## Index\n| Exhibit | From | When | Tags |\n|---|---|---|---|\n`;
+  c.msgs.forEach((x, i) => s += `| ${exLabel(c, i)} | ${x.r === 'u' ? (ME.first || 'You') : 'Li'} | ${day(x.ts)} ${hm(x.ts)} | ${tagsFor(plain(x), x.files).join(', ')} |\n`);
+  s += '\n## Exhibits\n';
+  c.msgs.forEach((x, i) => { s += `\n### ${exLabel(c, i)} · ${x.r === 'u' ? (ME.first || 'You') : 'Li'} · ${day(x.ts)} ${hm(x.ts)}${x.off ? ' · off-box' : ''}\n${plain(x)}\n`; if(x.files && x.files.length) s += 'Attached: ' + x.files.map(f => f.n).join(', ') + '\n'; });
+  return s;
+}
+function modelSheet(){
+  const c = chat(), cur = c ? c.model : S.nextModel;
+  sheet(`<div class="sh">Model</div>
+    <button class="opt" data-s="model" data-m="local">${ic('house')}<span>Li 27B<small>Runs on your L4. Nothing leaves the box.</small></span>${cur === 'local' ? `<span class="ck">${ic('check')}</span>` : ''}</button>
+    <button class="opt" data-s="nobig" style="opacity:.55">${ic('out')}<span>Bigger model (off-box)<small>Not set up. Needs an outside API key first.</small></span></button>`);
+}
+function offSheet(){
+  sheet(`<div class="sh">Send this chat off-box?</div><div class="warnbox">Your messages, files and the memories Li uses would go to an outside model. Every reply from it gets an "off-box" mark, and the badge at the top turns amber. Client data should stay on Li 27B.</div>
+    <div class="btns"><button class="btn" data-s="close">Keep it local</button><button class="btn warn" data-s="gobig">Use bigger model</button></div>`);
+}
+function pillSheet(){
+  const c = chat(), msgs = c ? c.msgs.filter(x => x.r === 'a') : [], off = msgs.filter(x => x.off).length;
+  sheet(`<div class="sh">${off || (c ? c.model : S.nextModel) === 'big' ? 'Some of this chat left your box' : 'Everything stayed on your box'}</div>
+    <div class="memitem">${ic('house')}<div>${msgs.length - off} ${msgs.length - off === 1 ? 'reply' : 'replies'} from Li 27B<small>Ran on your L4 GPU</small></div></div>
+    <div class="memitem">${ic('out')}<div>${off} ${off === 1 ? 'reply' : 'replies'} from an outside model<small>${off ? 'Marked "Sent off-box" on each reply' : 'None'}</small></div></div>
+    <div class="memitem">${ic('brain')}<div>Starter notes<small>Read on your box, never sent out</small></div></div>
+    <div class="memitem">${ic('globe')}<div>Web search ${webOn() ? 'on' : 'off'} for this chat<small>${webOn() ? 'Searches go out through the private search engine on your box' : 'Nothing goes out to the web'}</small></div></div>
+    <div class="memitem">${ic('file')}<div>Chats and files<small>Saved in this browser, sent only to your box</small></div></div>`);
+}
+function settingsSheet(){
+  sheet(`<div class="sh">Settings</div>
+    <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes<small>Read-only</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
+    <button class="opt" data-s="memview">${ic('lock')}See the starter notes</button>
+    <button class="opt" data-s="voiceset">${ic('speak')}<span>Voice<small>${S.voice.on ? 'Reads replies out loud' : 'Off'} · ${(VOICES.find(v => v[0] === S.voice.name) || VOICES[0])[1]}</small></span></button>
+    <button class="opt" data-s="connopen">${ic('out')}<span>Connectors<small>Firecrawl, CourtListener, Shodan, Hunter.io, Have I Been Pwned</small></span></button>
+    <button class="opt" data-s="faceset">${ic('face')}<span>${APPLE ? 'Face ID' : 'Passkeys'}<small>Sign in without your password</small></span></button>
+    ${ME.role === 'admin' ? `<button class="opt" data-s="people">${ic('people')}<span>People and invites<small>Invite, approve, change roles, remove</small></span></button>
+    <a class="opt" href="/admin/users" style="text-decoration:none;color:inherit">${ic('gear')}<span>Advanced admin<small>Models and settings (Open WebUI)</small></span></a>` : ''}
+    <button class="opt" data-s="signout">${ic('out')}Sign out</button>
+    <button class="opt danger" data-s="wipe">${ic('x')}Delete all chats on this device</button>`);
+}
+
+$('sheetIn').addEventListener('click', e => {
+  const b = e.target.closest('[data-s]'); if(!b) return;
+  const id = b.dataset.id, c = id && S.chats.find(x => x.id === id), s = b.dataset.s;
+  if(s === 'close') closeS();
+  else if(s === 'rename') renameSheet(id);
+  else if(s === 'dorename'){ const v = $('rn').value.trim(); if(v) c.title = v; closeS(); renderThread(true); save(); }
+  else if(s === 'pin'){ c.pinned = !c.pinned; closeS(); renderDrawer(); save(); toast(c.pinned ? 'Pinned' : 'Unpinned'); }
+  else if(s === 'move') moveSheet(id);
+  else if(s === 'domove'){ c.proj = b.dataset.p || null; closeS(); renderDrawer(); save(); toast(c.proj ? 'Moved to ' + proj(c.proj).name : 'Removed from channel'); }
+  else if(s === 'case'){ c.caseMode = !c.caseMode; b.querySelector('.sw').classList.toggle('on', c.caseMode); renderThread(true); save(); chatMenu(id); }
+  else if(s === 'index') indexSheet(id);
+  else if(s === 'goto'){ openChat(id); requestAnimationFrame(() => { const el = thread.querySelector(`[data-i="${b.dataset.i}"]`); el && el.scrollIntoView({block:'center'}); }); }
+  else if(s === 'packet'){ closeS(); openPanel('Case packet · ' + c.title, null, packet(c)); }
+  else if(s === 'copypacket') copy(packet(c));
+  else if(s === 'open') openChat(id);
+  else if(s === 'saveproj'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; save(); renderDrawer(); renderThread(true); toast('Channel saved'); projSheet(p.id); }
+  else if(s === 'projchat'){ const p = proj(b.dataset.p); p.name = $('pname').value.trim() || p.name; p.instr = $('pinstr').value; newChat(p.id); }
+  else if(s === 'pfile'){ fileTarget = b.dataset.p; $('fproj').click(); }
+  else if(s === 'srcdel'){ const p = proj(b.dataset.p); p.instr = $('pinstr').value; p.src.splice(+b.dataset.i, 1); save(); projSheet(p.id); }
+  else if(s === 'srcadd'){ const p = proj(b.dataset.p), n = $('srcn').value.trim(); let u = $('srcu').value.trim(); if(u && !/^https?:\/\//i.test(u)) u = 'https://' + u; if(!n || !okUrl(u)){ toast('Add a name and a full web address'); return; } p.instr = $('pinstr').value; p.src.push({n, u, d:''}); save(); projSheet(p.id); toast('Source added'); }
+  else if(s === 'projdel'){ const p = proj(b.dataset.p); sheet(`<div class="sh">Delete the ${esc(p.name)} channel?</div><div class="warnbox">Its instructions and sources go away. Its chats stay, moved out to Recents.</div><div class="btns"><button class="btn" data-s="projback" data-p="${p.id}">Keep it</button><button class="btn warn" data-s="projdodel" data-p="${p.id}">Delete channel</button></div>`); }
+  else if(s === 'projback' || s === 'chanset') projSheet(b.dataset.p);
+  else if(s === 'projdodel'){ const id = b.dataset.p; S.chats.forEach(c => { if(c.proj === id) c.proj = null; }); S.projects = S.projects.filter(p => p.id !== id); if(S.curProj === id) S.curProj = null; closeS(); renderThread(); save(); toast('Channel deleted'); }
+  else if(s === 'memtoggle'){ S.mem = !S.mem; b.querySelector('.sw').classList.toggle('on', S.mem); renderThread(true); save(); }
+  else if(s === 'memview') memSheet();
+  else if(s === 'nobig') toast('No outside model is set up, everything stays on your box');
+  else if(s === 'signout') signOut();
+  else if(s === 'wipe'){ sheet(`<div class="sh">Delete every chat on this device?</div><div class="warnbox">This clears chats, channels and case files saved in this browser. It can't be undone.</div><div class="btns"><button class="btn" data-s="close">Keep them</button><button class="btn warn" data-s="dowipe">Delete all</button></div>`); }
+  else if(s === 'dowipe'){ S = seed(); closeS(); renderThread(); save(); toast('Chats deleted'); }
+  else if(s === 'model'){ if(b.dataset.m === 'big'){ offSheet(); } else { const ch = chat(); if(ch) ch.model = 'local'; else S.nextModel = 'local'; closeS(); renderThread(true); save(); } }
+  else if(s === 'gobig'){ const ch = chat(); if(ch) ch.model = 'big'; else S.nextModel = 'big'; closeS(); renderThread(true); save(); toast('This chat now uses an off-box model'); }
+  else if(s === 'img'){ closeS(); $('fimg').click(); }
+  else if(s === 'file'){ closeS(); $('ffile').click(); }
+});
+$('sheetIn').addEventListener('input', e => { if(e.target.id === 'exf'){ const v = e.target.value, id = e.target.dataset.id, pos = e.target.selectionStart; indexSheet(id, v); const n = $('exf'); n.focus(); n.setSelectionRange(pos, pos); } });
+$('sheetIn').addEventListener('keydown', e => { if(e.target.id === 'rn' && e.key === 'Enter'){ e.preventDefault(); $('sheetIn').querySelector('[data-s="dorename"]').click(); } });
+
+$('drawer').addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'), mn = e.target.closest('[data-menu]'), pj = e.target.closest('[data-proj]');
+  if(o) openChat(o.dataset.open); else if(mn) chatMenu(mn.dataset.menu); else if(pj){ closeD(); newChat(pj.dataset.proj); }
+});
+$('projtag').onclick = () => S.curProj && projSheet(S.curProj);
+$('newproj').onclick = () => { const p = {id:'p'+Date.now(), name:'New channel', instr:'', files:[], src:[]}; S.projects.push(p); save(); closeD(); projSheet(p.id); };
+$('dmem').onclick = () => { closeD(); memSheet(); };
+$('dcase').onclick = () => { closeD(); caseList(); };
+$('settings').onclick = () => { closeD(); settingsSheet(); };
+$('more').onclick = () => { const c = chat(); if(c) chatMenu(c.id); };
+$('title').onclick = () => { const c = chat(); if(c) renameSheet(c.id); };
+$('pill').onclick = pillSheet;
+$('model').onclick = modelSheet;
+$('plus').onclick = () => sheet(`<div class="sh">Add to this message</div><button class="opt" data-s="img">${ic('img')}<span>Photos<small>Li looks at them on your box</small></span></button><button class="opt" data-s="file">${ic('file')}<span>Files<small>PDF, Word, text, CSV or code. Read on your box</small></span></button>`);
+
+/* panel */
+let pv = {src:'', text:''};
+function openPanel(title, html, text){
+  pv = {src:html, text:text || html}; $('ptitle').textContent = title;
+  $('pseg').style.display = html ? '' : 'none';
+  showPanel(html ? 'preview' : 'code'); document.body.classList.add('popen');
+}
+function showPanel(v){
+  [...$('pseg').children].forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  if(v === 'preview'){ const f = document.createElement('iframe'); f.setAttribute('sandbox', 'allow-scripts'); f.title = 'Live preview'; f.srcdoc = pv.src; $('pbody').replaceChildren(f); }
+  else $('pbody').innerHTML = `<pre>${esc(pv.text)}</pre>`;
+}
+$('pseg').onclick = e => { const b = e.target.closest('button'); if(b) showPanel(b.dataset.v); };
+$('pclose').onclick = () => document.body.classList.remove('popen');
+$('pcopy').onclick = () => copy(pv.text);
+
+/* ---------- uploads ---------- */
+let pending = [], fileTarget = null;
+function renderAtt(){ $('att').innerHTML = fileChips(pending, true); updateSend(); }
+$('att').onclick = e => { const b = e.target.closest('[data-rm]'); if(b){ pending.splice(+b.dataset.rm, 1); renderAtt(); } };
+const TEXTY = /\.(txt|md|markdown|csv|tsv|json|ya?ml|xml|html?|css|js|ts|py|ps1|sh|sql|log|ini|conf|toml)$/i;
+function addFiles(list){
+  [...list].forEach(f => {
+    const k = kind(f.name), e = {n:f.name, s:f.size, k, url: k === 'img' ? URL.createObjectURL(f) : ''};
+    pending.push(e);
+    if(k === 'img'){ if(f.size > 8e6){ e.skip = 'too big'; return; } const r = new FileReader(); r.onload = () => e.data = r.result; r.readAsDataURL(f); }
+    else if(TEXTY.test(f.name)){ if(f.size > 2e5){ e.skip = 'too big'; return; } f.text().then(t => e.text = t); }
+    else { e.busy = true; boxExtract(f).then(t => { e.text = t; }, () => { e.skip = 'unread'; toast(`Couldn't read ${f.name}`); }).finally(() => { e.busy = false; renderAtt(); }); }
+  });
+  renderAtt();
+}
+/* the box's own document reader (Open WebUI file extraction), nothing leaves the box */
+async function boxExtract(f){
+  if(f.size > 25e6) throw new Error('too big');
+  const fd = new FormData(); fd.append('file', f, f.name);
+  const up = await fetch('/api/v1/files/?process=true&process_in_background=false', {method:'POST', credentials:'same-origin', headers:token() ? {Authorization:'Bearer ' + token()} : {}, body:fd});
+  if(!up.ok) throw new Error('upload ' + up.status);
+  const j = await up.json();
+  let t = '';
+  for(let k = 0; k < 20 && !t; k++){
+    const r = await api('/api/v1/files/' + j.id + '/data/content');
+    if(r.ok) t = ((await r.json()).content || '').trim();
+    if(!t) await wait(1500);
+  }
+  if(!t) throw new Error('empty');
+  return t.slice(0, 60000);
+}
+$('fimg').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('ffile').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+$('fproj').onchange = async e => { const p = proj(fileTarget); if(p){ toast('Reading on your box'); for(const f of [...e.target.files]){ const x = {n:f.name, s:f.size, k:kind(f.name)}; try{ x.text = TEXTY.test(f.name) ? (await f.text()).slice(0, 60000) : x.k === 'img' ? '' : await boxExtract(f); }catch(err){ toast(`Couldn't read ${f.name}`); } p.files.push(x); } save(); projSheet(p.id); } e.target.value = ''; };
+
+/* ---------- composer ---------- */
+function updateSend(){
+  const has = q.value.trim() || pending.length;
+  app.classList.toggle('hasText', !!has);
+  send.classList.toggle('hide', !has && !busy);
+}
+q.addEventListener('input', () => { q.style.height = 'auto'; q.style.height = Math.min(q.scrollHeight, 160) + 'px'; updateSend(); });
+q.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey && !matchMedia('(pointer:coarse)').matches){ e.preventDefault(); $('form').requestSubmit(); } });
+
+/* ---------- the real thing: Open WebUI API on this box, streaming from Ollama ---------- */
+const token = () => localStorage.token || '';
+const api = (path, opt = {}) => fetch(path, {...opt, credentials:'same-origin', headers:{'Content-Type':'application/json', ...(token() ? {Authorization:'Bearer ' + token()} : {}), ...(opt.headers || {})}});
+function sysPrompt(c){
+  const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box.${webOn() ? ' Web search is on for this chat: when web pages are attached below, ground your answer in them and cite them.' : ' Web search is off for this chat, so nothing leaves this machine.'} Write like a sharp friend texting back: lead with the answer in the first sentence, keep it short (two to five sentences or a tight list) unless asked for depth, no headings, no sections explaining why you answered the way you did, no filler. Use a code block only for code. Never use em dashes.`];
+  if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
+  if(p){ if(p.instr) parts.push(`Channel "${p.name}" instructions:\n${p.instr}`); if((p.src || []).length) parts.push(`Reference sources for this channel. Point the user to them by name and link when they help. You can't open them from here, so never claim you checked one:\n` + p.src.map(s => `- ${s.n} (${s.u})${s.d ? ': ' + s.d : ''}`).join('\n')); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
+  if(chanKind(c) && toolsFor(c).length) parts.push('You can run tools on the box. To run one, put it on its own line as TOOL: name target, for example TOOL: domain example.com. Available here: ' + toolsFor(c).filter(t => !TOOLDEF[t].file).map(t => `${t} (${TOOLDEF[t].label}: ${TOOLDEF[t].ask.toLowerCase()})`).join(', ') + '. Use at most two per reply, only on targets the user gave you or that came out of earlier results, then stop and wait: the results come back as a tool message. When results are in, say what they show and what they do not prove, and cite the evidence number (E12). Never invent tool output.');
+  if(talkOn) parts.push('This reply will be spoken out loud on a voice call. Talk like a person on the phone: one to three short, natural sentences, no lists, no markdown, no code unless asked. Sound warm and direct.');
+  if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
+  return parts.join('\n\n');
+}
+function userContent(x){
+  let text = x.t || '';
+  (x.files || []).forEach(f => { if(f.text) text += `\n\nFile ${f.n}:\n\`\`\`\n${f.text}\n\`\`\``; else if(f.k !== 'img' || !f.data) text += `\n\n[Attached ${f.n}, which couldn't be read]`; });
+  const imgs = (x.files || []).filter(f => f.k === 'img' && f.data);
+  return imgs.length ? [{type:'text', text}, ...imgs.map(f => ({type:'image_url', image_url:{url:f.data}}))] : text;
+}
+
+/* ---------- web: private search on the box (SearXNG) plus a page reader, per-chat toggle ---------- */
+const webOn = () => { const c = chat(); return c ? c.web !== false : S.nextWeb !== false; };
+const paintWeb = () => { const b = $('webc'); if(!b) return; const on = webOn(); b.classList.toggle('on', on); b.innerHTML = ic('globe') + (on ? 'Web' : 'Web <i>off</i>'); b.setAttribute('aria-pressed', on); b.setAttribute('aria-label', on ? 'Web search on for this chat. Tap to turn off' : 'Web search off for this chat. Tap to turn on'); };
+$('webc').onclick = () => { const c = chat(), on = !webOn(); if(c) c.web = on; else S.nextWeb = on; save(); paintWeb(); toast(on ? 'Web search on for this chat' : 'Web search off. Nothing leaves the box'); };
+const hostOf = u => { try{ return new URL(u).hostname.replace(/^www\./, ''); }catch(e){ return ''; } };
+async function gatherWeb(c, idx, label){
+  const us = c.msgs.slice(0, idx).filter(x => x.r === 'u'), last = us[us.length - 1]; if(!last) return null;
+  const said = last.t || '';
+  const urls = [...new Set((said.match(/https?:\/\/[^\s)>\]"']+/g) || []).map(u => u.replace(/[.,;:!?]+$/, '')))];
+  let qtext = said.replace(/https?:\/\/\S+/g, ' ').replace(/\s+/g, ' ').trim();
+  if(qtext.split(' ').length < 5 && us.length > 1) qtext = (us[us.length - 2].t || '').slice(0, 160) + ' ' + qtext;
+  const p = c.proj && proj(c.proj), srcs = (p && p.src) || [], low = said.toLowerCase();
+  srcs.forEach(s => { const h = hostOf(s.u), w = (s.n || '').toLowerCase().split(/[\s(:]/)[0]; if((h && low.includes(h)) || (w.length >= 4 && new RegExp('\\b' + w.replace(/[^a-z0-9]/g, '') + '\\b').test(low))) urls.push(s.u); });
+  const want = [...new Set(urls)].slice(0, 3);
+  const searches = [];
+  if(/[a-z0-9]/i.test(qtext)){
+    label('Searching the web');
+    searches.push(j('/li-auth/web/search', {method:'POST', body:JSON.stringify({q:qtext.slice(0, 280), n:6})}).catch(() => ({results:[]})));
+    const doms = [...new Set(srcs.map(s => hostOf(s.u)).filter(Boolean))].slice(0, 4);
+    if(doms.length) searches.push(j('/li-auth/web/search', {method:'POST', body:JSON.stringify({q:qtext.slice(0, 200) + ' ' + doms.map(d => 'site:' + d).join(' OR '), n:4})}).catch(() => ({results:[]})));
+  }
+  const res = await Promise.all(searches), seen = new Set(want);
+  const scoped = (res[1] && res[1].results) || [], general = (res[0] && res[0].results) || [];
+  const hits = [...scoped.slice(0, 2), ...general].filter(r => !seen.has(r.url) && seen.add(r.url));
+  const pick = [...want.map(u => ({url:u, title:'', snippet:''})), ...hits].slice(0, 4);
+  if(!pick.length) return null;
+  label('Reading ' + pick.length + (pick.length > 1 ? ' pages' : ' page'));
+  const pages = await Promise.all(pick.map(r => j('/li-auth/web/read', {method:'POST', body:JSON.stringify({url:r.url, chars:4500})}).then(x => ({...r, title:x.title || r.title, text:x.text, url:x.url || r.url})).catch(() => r.snippet ? {...r, text:r.snippet} : null)));
+  const ok = pages.filter(x => x && x.text && x.text.trim().length > 40).map((x, k) => ({n:k + 1, t:x.title || hostOf(x.url), u:x.url, text:x.text}));
+  return ok.length ? ok : null;
+}
+
+/* ---------- tools: OSINT and Legal channels. Results land in the chat and in the case workspace ---------- */
+const TOOLDEF = {
+  domain:{label:'Domain lookup', kind:'osint', ask:'Domain', ph:'example.com', what:'WHOIS, DNS records, certificate logs (crt.sh) and Wayback history'},
+  ip:{label:'IP lookup', kind:'osint', ask:'Public IP address', ph:'93.184.215.14', what:'Network owner (RDAP) and reverse DNS'},
+  wayback:{label:'Wayback history', kind:'osint', ask:'Web address or domain', ph:'example.com/about', what:'When the Internet Archive captured it, year by year'},
+  username:{label:'Username sweep', kind:'osint', ask:'Username', ph:'jdoe', what:'Checks 500 sites for a public profile with this name (Maigret). Takes up to 3 minutes'},
+  harvest:{label:'Domain harvest', kind:'osint', ask:'Domain', ph:'example.com', what:'Subdomains and emails from certificate logs, passive DNS, urlscan and the site\'s own pages'},
+  exif:{label:'Photo metadata', kind:'osint', file:true, what:'Camera, time taken, software and GPS from a photo (exiftool). The photo\'s SHA-256 is logged'},
+  shodan:{label:'Shodan host', kind:'osint', conn:'shodan', ask:'Public IP address', ph:'93.184.215.14', what:'Open ports, services and known vulnerabilities Shodan has seen'},
+  hunter:{label:'Hunter.io emails', kind:'osint', conn:'hunter', ask:'Domain', ph:'example.com', what:'Public emails and the email pattern for a company domain'},
+  pwned:{label:'Breach check', kind:'osint', conn:'hibp', ask:'Email address', ph:'name@example.com', what:'Known data breaches this email appears in (Have I Been Pwned)'},
+  cases:{label:'Case law search', kind:'legal', ask:'Search', ph:'"check kiting" Texas', what:'Court opinions from CourtListener'},
+  dockets:{label:'Court dockets (RECAP)', kind:'legal', ask:'Search', ph:'party name or docket number', what:'Federal PACER dockets that are in the free RECAP archive'},
+  fedreg:{label:'Federal Register', kind:'legal', ask:'Search', ph:'money transmitter rule', what:'Federal rules, proposed rules and notices'},
+  ecfr:{label:'eCFR', kind:'legal', ask:'Search', ph:'suspicious activity report', what:'Current Code of Federal Regulations text'},
+  scrape:{label:'Firecrawl scrape', kind:'any', conn:'firecrawl', ask:'Web address', ph:'https://example.com/page', what:'Clean text of any page, including pages that need a real browser'},
+  fsearch:{label:'Firecrawl search', kind:'any', conn:'firecrawl', ask:'Search', ph:'query', what:'Web search that returns full page content'},
+  crawl:{label:'Firecrawl crawl', kind:'any', conn:'firecrawl', ask:'Web address', ph:'https://example.com', what:'Reads up to 10 pages of a site'}
+};
+const SLASH = {domain:'domain', whois:'domain', dns:'domain', ip:'ip', wayback:'wayback', user:'username', username:'username', harvest:'harvest', exif:'exif', photo:'exif',
+  shodan:'shodan', hunter:'hunter', pwned:'pwned', breach:'pwned', scrape:'scrape', search:'fsearch', crawl:'crawl', cases:'cases', caselaw:'cases', dockets:'dockets', fedreg:'fedreg', ecfr:'ecfr', cfr:'ecfr'};
+let CONN = {}; /* connector id -> connected, from the box */
+async function loadConn(){ try{ (await j('/li-auth/connectors')).forEach(x => CONN[x.id] = x); }catch(e){} }
+const chanOf = c => { const id = c ? c.proj : S.curProj; return id ? proj(id) : null; };
+const chanKind = c => { const p = chanOf(c); return p ? (p.kind || (/^osint$/i.test(p.name) ? 'osint' : /^legal$/i.test(p.name) ? 'legal' : null)) : null; };
+const caseName = c => { const p = chanOf(c); return p ? p.name : 'General'; };
+const connOn = (c, id) => { const p = chanOf(c); return !!(CONN[id] && CONN[id].connected) && !(p && p.connOff && p.connOff[id]); };
+const toolsFor = c => { const k = chanKind(c); if(!k) return []; return Object.keys(TOOLDEF).filter(t => { const d = TOOLDEF[t]; return (d.kind === k || d.kind === 'any') && (!d.conn || connOn(c, d.conn)); }); };
+function toolContext(x){
+  if(x.err) return `Tool ${x.tool} on ${x.target} failed: ${x.err}`;
+  return `Tool result: ${(TOOLDEF[x.tool] || {}).label || x.tool} for "${x.target}" from ${x.ev ? x.ev.source : 'the box'} (saved as evidence E${x.ev ? x.ev.id : '?'}, SHA-256 ${x.ev ? x.ev.sha256 : ''}). Summary: ${x.summary}\n` + JSON.stringify(x.data || {}).slice(0, 7000);
+}
+function ensureChat(text){
+  let c = chat();
+  if(!c){ c = {id:'c' + Date.now(), title:text.slice(0, 42), pinned:false, proj:S.curProj, web:S.nextWeb !== false, model:S.nextModel, caseMode:false, t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; }
+  return c;
+}
+async function runTool(c, tool, target, thenAsk){
+  c = c || ensureChat('/' + tool + ' ' + target);
+  if(!c.msgs.length || chat() !== c){ S.cur = c.id; }
+  const m = {r:'t', tool, target, ts:Date.now(), v:[{md:''}], vi:0, summary:'Running…'};
+  c.msgs.push(m); c.t = Date.now(); renderThread(); toEnd(); save();
+  try{
+    const x = await j('/li-auth/tool/' + tool, {method:'POST', body:JSON.stringify({target, case:caseName(c)})});
+    Object.assign(m, {summary:x.evidence.summary, ev:x.evidence, data:x.data}); m.v = [{md:`${(TOOLDEF[tool]||{}).label}: ${target}. ${x.evidence.summary}`}];
+  }catch(e){ m.err = e.message; m.summary = ''; m.v = [{md:`${tool} ${target} failed: ${e.message}`}]; }
+  renderThread(true); toEnd(); save();
+  if(thenAsk && !m.err && !busy) await respond(c, c.msgs.length, false);
+  return m;
+}
+async function toolFollowUp(c, idx, msg){
+  if(!chanKind(c) || (msg.toolDepth || 0) >= 2) return;
+  const allowed = toolsFor(c).filter(t => !TOOLDEF[t].file);
+  const calls = [...plain(msg).matchAll(/^\s*TOOL:\s*(\w+)\s+(.+?)\s*$/gim)].map(m => [SLASH[m[1].toLowerCase()] || m[1].toLowerCase(), m[2].replace(/[`*]/g, '').trim()]).filter(([t]) => allowed.includes(t)).slice(0, 2);
+  if(!calls.length) return;
+  for(const [t, target] of calls) await runTool(c, t, target, false);
+  if(busy) return;
+  const before = c.msgs.length; await respond(c, c.msgs.length, false);
+  const nm = c.msgs[before]; if(nm) nm.toolDepth = (msg.toolDepth || 0) + 1;
+}
+let exifTarget = null;
+$('fexif').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+  const c = ensureChat('Photo metadata: ' + f.name); renderThread();
+  const m = {r:'t', tool:'exif', target:f.name, ts:Date.now(), v:[{md:''}], vi:0, summary:'Reading the photo…'}; c.msgs.push(m); renderThread(); toEnd();
+  try{
+    const r = await fetch('/li-auth/tool-exif', {method:'POST', credentials:'same-origin', headers:{Authorization:'Bearer ' + token(), 'Content-Type':'application/octet-stream', 'x-file-name':f.name.replace(/[^\w .-]/g, '_').slice(0, 100), 'x-case':caseName(c)}, body:f});
+    const x = await r.json().catch(() => ({})); if(!r.ok) throw new Error(x.detail || 'Could not read that photo.');
+    Object.assign(m, {summary:x.evidence.summary, ev:x.evidence, data:x.data}); m.v = [{md:`Photo metadata: ${f.name}. ${x.evidence.summary}`}];
+  }catch(err){ m.err = err.message; m.summary = ''; m.v = [{md:'Photo metadata failed: ' + err.message}]; }
+  renderThread(true); toEnd(); save();
+  if(!m.err && !busy) respond(c, c.msgs.length, false);
+};
+function toolsSheet(){
+  const c = chat(), k = chanKind(c); if(!k) return;
+  const all = Object.keys(TOOLDEF).filter(t => TOOLDEF[t].kind === k || TOOLDEF[t].kind === 'any'), ok = toolsFor(c);
+  sheet(`<div class="sh">${ic('search')} ${k === 'legal' ? 'Legal' : 'OSINT'} tools</div>
+    <div class="note">Results show up in the chat, Li reads them, and each one is saved to the ${esc(caseName(c))} case workspace with a timestamp and SHA-256. You can also type /${k === 'legal' ? 'cases' : 'domain'} and a target, or just ask Li.</div>
+    ${all.map(t => { const d = TOOLDEF[t], on = ok.includes(t); return `<button class="opt" data-s="${on ? 'toolpick' : 'connset'}" data-t="${t}">${ic(d.file ? 'img' : d.conn ? 'out' : 'search')}<span>${esc(d.label)}<small>${esc(d.what)}${on ? '' : ' · needs your ' + esc(CONNECTORS_UI[d.conn].name) + ' key'}</small></span>${on ? '' : '<span class="badge">Connect</span>'}</button>`; }).join('')}
+    <div class="btns" style="margin-top:10px"><button class="btn" data-s="caseopen">Case workspace</button></div>`);
+}
+function toolForm(t){
+  const d = TOOLDEF[t]; if(d.file){ exifTarget = (chat() || {}).id; closeS(); $('fexif').click(); return; }
+  sheet(`<div class="sh">${esc(d.label)}</div><div class="note">${esc(d.what)}</div>
+    <input class="field" id="tgt" placeholder="${esc(d.ph || '')}" aria-label="${esc(d.ask)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="btns"><button class="btn" data-s="toolsback">Back</button><button class="btn dark" data-s="toolrun" data-t="${t}">Run</button></div>`);
+  setTimeout(() => $('tgt') && $('tgt').focus(), 50);
+}
+/* ---------- case workspace ---------- */
+let caseTab = 'evidence', caseQ = '';
+async function caseSheet(name, tab){
+  caseTab = tab || caseTab; const base = '/li-auth/case/' + encodeURIComponent(name);
+  const head = `<div class="sh">${ic('case')} ${esc(name)} case</div>
+    <div class="seg"><button class="${caseTab === 'evidence' ? 'on' : ''}" data-s="ctab" data-t="evidence" data-c="${esc(name)}">Evidence</button><button class="${caseTab === 'entities' ? 'on' : ''}" data-s="ctab" data-t="entities" data-c="${esc(name)}">Entities</button><button class="${caseTab === 'timeline' ? 'on' : ''}" data-s="ctab" data-t="timeline" data-c="${esc(name)}">Timeline</button></div>
+    ${caseTab === 'timeline' ? '' : `<input class="field" id="cq" type="search" placeholder="Search ${caseTab} and tags" value="${esc(caseQ)}" data-c="${esc(name)}" style="margin-top:0">`}`;
+  sheet(head + '<div class="note">Loading…</div>');
+  try{
+    let body = '';
+    if(caseTab === 'evidence'){
+      const xs = await j(base + '/evidence?q=' + encodeURIComponent(caseQ));
+      body = xs.map(x => `<div class="prow"><div class="av" style="font-size:11px">E${x.id}</div><div class="who"><b>${esc((TOOLDEF[x.kind] || {}).label || x.kind)}: ${esc(x.target)}</b><small>${esc(x.summary)}</small><small>${new Date(x.created_at * 1000).toLocaleString()} · ${esc(x.source)} · SHA-256 ${esc(x.sha256.slice(0, 12))}…${x.tags ? ' · #' + esc(x.tags.replace(/,/g, ' #')) : ''}</small></div><div class="pa"><button class="btn mini" data-s="evone" data-id="${x.id}">Open</button></div></div>`).join('') || '<div class="empty">Nothing saved yet. Run a tool and it lands here.</div>';
+    } else if(caseTab === 'entities'){
+      const xs = await j(base + '/entities?q=' + encodeURIComponent(caseQ)); let last = '';
+      body = xs.map(x => { const h = x.etype !== last ? `<div class="lab" style="padding:12px 4px 2px">${esc(x.etype)}s</div>` : ''; last = x.etype;
+        return h + `<div class="prow"><div class="who"><b style="font-family:var(--mono);font-size:13px">${esc(x.value)}</b><small>Seen in ${esc(x.evidence.split(',').map(e => 'E' + e).join(', '))} · first ${new Date(x.first_seen * 1000).toLocaleDateString()}${x.tags ? ' · #' + esc(x.tags.replace(/,/g, ' #')) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></div><div class="pa"><button class="btn mini" data-s="entag" data-id="${x.id}" data-tags="${esc(x.tags)}" data-note="${esc(x.note)}" data-c="${esc(name)}">Tag</button></div></div>`; }).join('') || '<div class="empty">No entities yet.</div>';
+    } else {
+      const xs = await j(base + '/timeline');
+      body = `<div style="display:flex;gap:6px;margin-bottom:8px"><input class="field" id="cnote" placeholder="Add a note to the timeline" style="margin:0"><button class="btn dark" data-s="cnote" data-c="${esc(name)}">Add</button></div>` +
+        (xs.map(x => `<div class="prow"><div class="av" style="font-size:11px">${esc(x.ref)}</div><div class="who"><b>${esc(x.what)}</b><small>${new Date(x.at * 1000).toLocaleString()}</small><small>${esc(x.detail || '')}</small></div></div>`).join('') || '<div class="empty">Nothing on the timeline yet.</div>');
+    }
+    sheet(head + body);
+  }catch(e){ sheet(head + `<div class="warnbox">${esc(e.message)}</div>`); }
+}
+async function evidenceSheet(id){
+  try{
+    const x = await j('/li-auth/evidence/' + id);
+    sheet(`<div class="sh">Evidence E${x.id}</div>
+      <div class="memitem">${ic('check')}<div>${x.verified ? 'Hash checks out' : 'Hash does NOT match'}<small>SHA-256 ${esc(x.sha256)}${x.file_sha256 ? '<br>File SHA-256 ' + esc(x.file_sha256) : ''}</small></div></div>
+      <div class="memitem">${ic('search')}<div>${esc((TOOLDEF[x.kind] || {}).label || x.kind)}: ${esc(x.target)}<small>${new Date(x.created_at * 1000).toLocaleString()} · ${esc(x.source)} · case ${esc(x.case_name)}</small></div></div>
+      <div class="note" style="margin-top:10px">Tags (comma separated)</div><input class="field" id="evtags" value="${esc(x.tags)}">
+      <pre class="evraw">${esc(JSON.stringify(x.data, null, 2).slice(0, 40000))}</pre>
+      <div class="btns"><button class="btn" data-s="evcopy" data-id="${x.id}">Copy JSON</button><button class="btn dark" data-s="evtag" data-id="${x.id}" data-c="${esc(x.case_name)}">Save tags</button></div>`);
+    window.__ev = x;
+  }catch(e){ toast(e.message); }
+}
+/* ---------- connectors (Settings) ---------- */
+const CONNECTORS_UI = {firecrawl:{name:'Firecrawl'}, courtlistener:{name:'CourtListener'}, shodan:{name:'Shodan'}, hunter:{name:'Hunter.io'}, hibp:{name:'Have I Been Pwned'}};
+const BUILTIN = [['Private web search (SearXNG)','On the box, no key'],['crt.sh certificate logs','Free, no key'],['Internet Archive (Wayback)','Free, no key'],['RDAP and WHOIS registries','Free, no key'],['DNS','Free, no key'],['AlienVault OTX, HackerTarget, urlscan.io','Free public endpoints, no key, low daily limits'],['Maigret username sweep','Open source, runs on the box'],['exiftool photo metadata','Open source, runs on the box'],['CourtListener','Works without a key, a free token raises limits'],['Federal Register and eCFR','Free, no key']];
+async function connSheet(focus){
+  let xs = []; try{ xs = await j('/li-auth/connectors'); xs.forEach(x => CONN[x.id] = x); }catch(e){ toast(e.message); return; }
+  const c = chat(), p = chanOf(c);
+  sheet(`<div class="sh">${ic('out')} Connectors</div><div class="note">Your own API keys. They're stored encrypted on the box, only the last 4 characters are ever shown, and they're used only for your account.</div>
+    ${xs.map(x => `<div class="conn" id="cn-${x.id}"><div class="ch"><b>${esc(x.name)}</b><span class="badge ${x.connected ? 'used' : ''}">${x.connected ? 'Connected · …' + esc(x.last4) : 'Not connected'}</span></div>
+      <div class="note" style="margin:4px 0 8px">${esc(x.what)}</div>
+      ${x.connected ? `<div class="btns" style="justify-content:flex-start">${p ? `<button class="opt" style="padding:6px 0;width:auto" data-s="connch" data-k="${x.id}"><span>On in #${esc(p.name)}</span><span class="sw ${p.connOff && p.connOff[x.id] ? '' : 'on'}" style="margin-left:10px"></span></button>` : ''}<button class="btn mini" data-s="conndel" data-k="${x.id}" style="margin-left:auto">Remove key</button></div>`
+        : `<div style="display:flex;gap:6px"><input class="field" id="ck-${x.id}" type="password" autocomplete="off" placeholder="Paste your ${esc(x.name)} API key" style="margin:0"><button class="btn dark" data-s="connsave" data-k="${x.id}">Connect</button></div><a class="note" href="${esc(x.key_url)}" target="_blank" rel="noopener noreferrer" style="display:block;margin-top:6px;color:var(--rust)">Where to get a key</a>`}</div>`).join('')}
+    <div class="lab" style="padding:14px 4px 4px">Built in, nothing to connect</div>
+    ${BUILTIN.map(([n, d]) => `<div class="memitem">${ic('check')}<div>${esc(n)}<small>${esc(d)}</small></div></div>`).join('')}`);
+  if(focus) setTimeout(() => { const el = $('cn-' + focus); el && el.scrollIntoView({block:'center'}); const i = $('ck-' + focus); i && i.focus(); }, 60);
+}
+$('sheetIn').addEventListener('click', async e => {
+  const b = e.target.closest('[data-s]'); if(!b) return; const s = b.dataset.s;
+  if(s === 'toolpick') toolForm(b.dataset.t);
+  else if(s === 'toolsback') toolsSheet();
+  else if(s === 'toolrun'){ const v = $('tgt').value.trim(); if(!v) return; closeS(); runTool(chat() || null, b.dataset.t, v, true); }
+  else if(s === 'connset') connSheet(TOOLDEF[b.dataset.t].conn);
+  else if(s === 'connopen') connSheet();
+  else if(s === 'caseopen') caseSheet(caseName(chat()));
+  else if(s === 'ctab'){ caseQ = ''; caseSheet(b.dataset.c, b.dataset.t); }
+  else if(s === 'evone') evidenceSheet(+b.dataset.id);
+  else if(s === 'evcopy') copy(JSON.stringify(window.__ev, null, 2));
+  else if(s === 'evtag'){ try{ await j('/li-auth/tag/evidence/' + b.dataset.id, {method:'POST', body:JSON.stringify({tags:$('evtags').value})}); toast('Tags saved'); caseSheet(b.dataset.c, 'evidence'); }catch(err){ toast(err.message); } }
+  else if(s === 'entag'){ sheet(`<div class="sh">Tag entity</div><input class="field" id="entags" placeholder="tags, comma separated" value="${esc(b.dataset.tags)}"><input class="field" id="ennote" placeholder="note" value="${esc(b.dataset.note)}"><div class="btns"><button class="btn" data-s="ctab" data-t="entities" data-c="${esc(b.dataset.c)}">Back</button><button class="btn dark" data-s="ensave" data-id="${b.dataset.id}" data-c="${esc(b.dataset.c)}">Save</button></div>`); }
+  else if(s === 'ensave'){ try{ await j('/li-auth/tag/entity/' + b.dataset.id, {method:'POST', body:JSON.stringify({tags:$('entags').value, note:$('ennote').value})}); caseSheet(b.dataset.c, 'entities'); }catch(err){ toast(err.message); } }
+  else if(s === 'cnote'){ const v = $('cnote').value.trim(); if(!v) return; try{ await j('/li-auth/case/' + encodeURIComponent(b.dataset.c) + '/note', {method:'POST', body:JSON.stringify({text:v})}); caseSheet(b.dataset.c, 'timeline'); }catch(err){ toast(err.message); } }
+  else if(s === 'connsave'){ const k = b.dataset.k, v = $('ck-' + k).value.trim(); if(!v) return; b.disabled = true; b.textContent = 'Checking…'; try{ await j('/li-auth/connectors/' + k, {method:'POST', body:JSON.stringify({key:v})}); toast(CONNECTORS_UI[k].name + ' connected'); }catch(err){ toast(err.message); } connSheet(); }
+  else if(s === 'conndel'){ try{ await j('/li-auth/connectors/' + b.dataset.k, {method:'DELETE'}); toast('Key removed'); }catch(err){ toast(err.message); } connSheet(); }
+  else if(s === 'connch'){ const p = chanOf(chat()); if(!p) return; p.connOff = p.connOff || {}; p.connOff[b.dataset.k] = !p.connOff[b.dataset.k]; save(); b.querySelector('.sw').classList.toggle('on', !p.connOff[b.dataset.k]); paintTools(); }
+});
+$('sheetIn').addEventListener('keydown', e => {
+  if(e.target.id === 'cq' && e.key === 'Enter'){ caseQ = e.target.value.trim(); caseSheet(e.target.dataset.c); }
+  if(e.target.id === 'tgt' && e.key === 'Enter'){ e.preventDefault(); const r = $('sheetIn').querySelector('[data-s="toolrun"]'); r && r.click(); }
+});
+function paintTools(){ const k = chanKind(chat()); $('toolc').style.display = k ? '' : 'none'; $('casec').style.display = k ? '' : 'none'; $('toolc').innerHTML = ic('search') + 'Tools'; $('casec').innerHTML = ic('case') + 'Case'; }
+$('toolc').onclick = toolsSheet; $('casec').onclick = () => caseSheet(caseName(chat()));
+let busy = false, ctl = null, leftPage = false;
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ if(busy) leftPage = true; return; }
+  /* back on the page: if a reply died while you were away, try it again once */
+  const c = chat(); if(!c || busy) return;
+  const i = c.msgs.length - 1, m = c.msgs[i];
+  if(m && m.r === 'a' && m.retryOnShow){ m.retryOnShow = false; toast('Picking the reply back up'); respond(c, i, false); }
+  /* and check the sign-in is still good */
+  api('/api/v1/auths/').then(r => { if(r.status === 401) authSheet(false); }).catch(() => {});
+});
+const wait = ms => new Promise(r => setTimeout(r, ms));
+async function respond(c, idx, alt){
+  busy = true; app.classList.add('busy'); updateSend(); send.setAttribute('aria-label', 'Stop');
+  const think = document.createElement('div'); think.className = 'think';
+  think.innerHTML = `<span class="zm mini spin" aria-hidden="true"></span><span class="lbl">Li is reading</span>`;
+  const target = thread.querySelector(`.a[data-i="${idx}"]`);
+  if(target) target.replaceWith(think); else thread.append(think);
+  toEnd(); window.liTps = 0;
+  let web = null;
+  if(webOn()){ try{ web = await gatherWeb(c, idx, t => { const l = think.querySelector('.lbl'); if(l) l.textContent = t; }); }catch(e){ web = null; } const l = think.querySelector('.lbl'); if(l) l.textContent = 'Li is reading'; }
+  let sp = sysPrompt(c);
+  if(web) sp += '\n\nWeb pages fetched just now for this question. Use them, cite them inline as [1], [2] by number, and say when they don\'t answer it. Never cite a number that isn\'t listed here:\n' + web.map(w => `[${w.n}] ${w.t} (${w.u})\n${w.text}`).join('\n\n');
+  else if(webOn()) sp += '\n\nWeb search is on for this chat but found nothing usable for this message. Answer from what you know and say so if it matters.';
+  const msgs = [{role:'system', content:sp}];
+  c.msgs.slice(0, idx).forEach(x => msgs.push(x.r === 'u' ? {role:'user', content:userContent(x)} : x.r === 't' ? {role:'user', content:toolContext(x)} : {role:'assistant', content:plain(x)}));
+  let md = '', err = '', tps = null, toks = 0, first = 0, last = 0, inThink = false, a = null, body = null, tpsEl = null;
+  const stamps = [];
+  const tick = () => { const t = performance.now(); toks++; if(!first) first = t; last = t; stamps.push(t); while(stamps.length && t - stamps[0] > 1500) stamps.shift(); window.liTps = stamps.length > 2 ? (stamps.length - 1) / ((t - stamps[0]) / 1000) : 0; if(tpsEl) tpsEl.textContent = window.liTps ? window.liTps.toFixed(1) + ' tok/s' : ''; };
+  const show = () => {
+    const vis = md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').replace(/^\s+/, '');
+    if(!vis){ think.querySelector('.lbl').textContent = 'Li is thinking'; return; }
+    if(!a){
+      a = document.createElement('div'); a.className = 'a';
+      a.innerHTML = `<div class="body"></div><div class="acts"><span class="where">${ic('house')} On your box · <span class="tps" data-tps></span></span><span class="zm mini spin" aria-hidden="true"></span></div>`;
+      think.replaceWith(a); body = a.firstChild; tpsEl = a.querySelector('[data-tps]');
+    }
+    body.innerHTML = blocks(parseMd(vis)).replace(/<\/(p|li)>(<\/[uo]l>)?$/, '<span class="caret"></span></$1>$2');
+    toEnd(true);
+  };
+  const speakNow = talkOn || S.voice.on; if(speakNow){ voice.stop(); voice.unlock(); }
+  ctl = new AbortController(); leftPage = document.hidden;
+  const slow = setTimeout(() => { const l = think.querySelector('.lbl'); if(l && !toks) l.textContent = 'Waking up the 27B. After a break the first reply takes a couple of minutes.'; }, 8000);
+  try{
+    const r = await api('/api/chat/completions', {method:'POST', signal:ctl.signal, body:JSON.stringify({model:MODEL, stream:true, messages:msgs, ...(alt ? {temperature:0.9} : {})})});
+    if(r.status === 401 || r.status === 403){ throw new Error('signin'); }
+    if(!r.ok || !r.body){ throw new Error('The box said ' + r.status + ' ' + (await r.text()).slice(0, 120)); }
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = '';
+    for(;;){
+      const {value, done} = await rd.read(); if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let nl; while((nl = buf.indexOf('\n')) >= 0){
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if(!line.startsWith('data:')) continue;
+        const d = line.slice(5).trim(); if(d === '[DONE]') continue;
+        let j; try{ j = JSON.parse(d); }catch(e){ continue; }
+        if(j.error){ err = (j.error.message || String(j.error)).slice(0, 160); continue; }
+        const ch = j.choices && j.choices[0], dl = ch && ch.delta || {};
+        if(dl.reasoning_content || dl.reasoning){ tick(); think.querySelector('.lbl') && (think.querySelector('.lbl').textContent = 'Li is thinking'); }
+        if(dl.content){ md += dl.content; tick(); show(); if(speakNow) voice.feed(dl.content); }
+        const u = j.usage; if(u){ const v = u['response_token/s'] || (u.eval_count && u.eval_duration ? u.eval_count / (u.eval_duration / 1e9) : null); if(v) tps = +v; }
+      }
+    }
+    if(!toks && !err) err = 'The box ended the reply early. Tap retry.';
+  }catch(e){
+    if(e.name === 'AbortError' && !leftPage) md += (md ? '\n\n' : '') + '*Stopped.*';
+    else if(e.message === 'signin'){ err = 'Signed out'; authSheet(); }
+    else if(leftPage || document.hidden) err = 'The reply stopped when you left the page. It picks back up when you return.';
+    else if(/failed to fetch|load failed|network|connection/i.test(e.message || '')) err = "Couldn't reach the box. Check your signal and tap retry.";
+    else err = e.message || "Couldn't reach the box. Tap retry.";
+  }
+  clearTimeout(slow); ctl = null; window.liTps = 0; if(speakNow){ if(err) voice.stop(); else voice.end(); }
+  if(tps == null && toks > 4 && last > first) tps = (toks - 1) / ((last - first) / 1000);
+  const msg = c.msgs[idx] || {r:'a', v:[], vi:0, ts:Date.now()};
+  if(msg.err && msg.v.length && !String(msg.v[msg.v.length - 1].md || '').trim()) msg.v.pop(); /* a retry replaces the failed empty try */
+  msg.v.push({md: md.replace(/<think>[\s\S]*?(<\/think>|$)/g, '').trim() || (err ? '' : '*No reply.*')}); msg.vi = msg.v.length - 1;
+  msg.tps = tps; msg.off = false; msg.web = web ? web.map(({n, t, u}) => ({n, t, u})) : undefined; msg.ts = Date.now(); msg.mem = S.mem && MEM.length ? MEM.map((m, k) => k) : []; msg.err = err || undefined; msg.retryOnShow = !!(err && (leftPage || document.hidden));
+  c.msgs[idx] = msg; c.t = Date.now();
+  busy = false; leftPage = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
+  renderThread(true); toEnd(); save();
+  if(!err && !talkOn) setTimeout(() => toolFollowUp(c, idx, msg), 0);
+  return err ? '' : plain(msg);
+}
+$('form').onsubmit = e => {
+  e.preventDefault(); if(S.voice.on) voice.unlock();
+  if(busy){ ctl && ctl.abort(); voice.stop(); return; }
+  const text = q.value.trim(); if(!text && !pending.length) return;
+  let c = chat();
+  if(!c){ c = {id:'c' + Date.now(), title:(text || pending[0].n).slice(0, 42), pinned:false, proj:S.curProj, web:S.nextWeb !== false, model:S.nextModel, caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; S.nextModel = 'local'; }
+  if(pending.some(f => f.busy || (!f.skip && !f.text && !f.data))){ toast('Still reading your file, one sec'); return; }
+  const sl = text.match(/^\/(\w+)\s*(.*)$/);
+  if(sl && SLASH[sl[1].toLowerCase()] && chanKind(c)){
+    const tl = SLASH[sl[1].toLowerCase()];
+    if(!toolsFor(c).includes(tl)){ toast((TOOLDEF[tl] || {}).label + ' is not available in this channel'); return; }
+    q.value = ''; q.style.height = 'auto';
+    if(tl === 'exif'){ exifTarget = c.id; $('fexif').click(); return; }
+    if(!sl[2].trim()){ toolForm(tl); return; }
+    runTool(c, tl, sl[2].trim(), true); return;
+  }
+  c.msgs.push({r:'u', t:text || 'Here are the files.', files:pending.map(({n,s,k,url,text,data}) => ({n,s,k,url,text,data})), ts:Date.now()});
+  pending = []; renderAtt(); q.value = ''; q.style.height = 'auto';
+  renderThread(); respond(c, c.msgs.length, false);
+};
+
+/* message actions: copy, rate, regenerate, versions, edit, preview, memory chips */
+thread.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if(!b || busy) return;
+  const c = chat(), node = b.closest('[data-i]'), i = +node.dataset.i, msg = c.msgs[i], act = b.dataset.act;
+  if(act === 'evopen'){ evidenceSheet(+b.dataset.ev); return; }
+  if(act === 'caseopen'){ caseSheet(caseName(c)); return; }
+  if(act === 'copy') copy(plain(msg));
+  else if(act === 'speak'){ voice.stop(); voice.unlock(); voice.feed(plain(msg)); voice.end(); }
+  else if(act === 'good' || act === 'bad'){ const v = act === 'good' ? 1 : -1; msg.rate = msg.rate === v ? 0 : v; renderThread(true); save(); }
+  else if(act === 'regen') respond(c, i, true);
+  else if(act === 'retry'){ msg.retryOnShow = false; respond(c, i, false); }
+  else if(act === 'vprev' || act === 'vnext'){ msg.vi = (msg.vi + (act === 'vnext' ? 1 : -1) + msg.v.length) % msg.v.length; renderThread(true); save(); }
+  else if(act === 'mem'){ msg.showMem = !msg.showMem; renderThread(true); }
+  else if(act === 'edit'){ msg.editing = true; renderThread(true); const ta = thread.querySelector('[data-edit]'); ta && ta.focus(); }
+  else if(act === 'canceledit'){ msg.editing = false; renderThread(true); }
+  else if(act === 'saveedit'){ const v = node.querySelector('[data-edit]').value.trim(); if(!v) return; msg.t = v; msg.editing = false; c.msgs.length = i + 1; renderThread(); respond(c, i + 1, false); }
+  else if(act === 'preview'){ const bl = parseMd(plain(msg))[+b.dataset.b].code; openPanel(bl.title, bl.src, bl.src); }
+  else if(act === 'copycode'){ copy(parseMd(plain(msg))[+b.dataset.b].code.src); }
+});
+
+/* ---------- talk mode: you talk, the box's own Whisper writes it down, the 27B answers, your phone reads it out ---------- */
+let talkOn = false, muted = false, rec = null, stream = null;
+$('tl').innerHTML = ic('lock') + 'Talk mode · Li hears and speaks on your box';
+/* Li's voice: Kokoro on the box, one sentence at a time while the reply streams in.
+   Falls back to the phone's own voice if the box voice can't be reached. */
+const sayLocal = text => new Promise(res => {
+  if(!('speechSynthesis' in window) || !text){ res(); return; }
+  const u = new SpeechSynthesisUtterance(text);
+  const v = speechSynthesis.getVoices().filter(x => x.localService && /^en/i.test(x.lang));
+  if(v.length) u.voice = v.find(x => /samantha|daniel|alex|aaron|natural/i.test(x.name)) || v[0];
+  u.onend = u.onerror = () => res(); speechSynthesis.speak(u);
+});
+const voice = (() => {
+  let gen = 0, buf = '', chain = Promise.resolve(), pending = 0, doneRes = null, ended = false, unlocked = false, playing = null;
+  /* one <audio> element, unlocked by a tap, then reused: iPhones play it even with the silent switch on */
+  const el = new Audio(); el.setAttribute('playsinline', ''); el.preload = 'auto';
+  const silent = (() => { const n = 2400, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 24000, true); v.setUint32(28, 48000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    return URL.createObjectURL(new Blob([b], {type:'audio/wav'})); })();
+  const spoken = t => t.replace(/```[\s\S]*?(```|$)/g, ' I put the code in the chat. ').replace(/`([^`]*)`/g, '$1').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, 'a link').replace(/\[\d+(?:,\s*\d+)*\]/g, '').replace(/[*_#>|~]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const unlock = () => {
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+    if(unlocked || playing) return;
+    try{ el.src = silent; const p = el.play(); unlocked = true; p && p.catch(() => { unlocked = false; }); }catch(e){}
+  };
+  const fetchWav = text => api('/li-auth/tts', {method:'POST', body:JSON.stringify({text, voice:S.voice.name || 'af_heart'})}).then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error('tts ' + r.status)));
+  const play = ab => new Promise(res => {
+    const url = URL.createObjectURL(new Blob([ab], {type:'audio/wav'}));
+    const done = ok => { if(playing !== url) return; playing = null; URL.revokeObjectURL(url); window.liTps = 0; $('spk') && $('spk').classList.remove('talking'); res(ok); };
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'playback'; }catch(e){}
+    playing = url; el.onended = () => done(true); el.onerror = () => done(false); el.src = url;
+    const p = el.play(); window.liTps = 18; $('spk') && $('spk').classList.add('talking');
+    if(p) p.catch(() => done(false));
+  });
+  const settle = () => { if(ended && !pending && doneRes){ const r = doneRes; doneRes = null; r(); } };
+  const say = text => {
+    const g = gen, t = spoken(text); if(!/[a-z0-9]/i.test(t)) return;
+    pending++;
+    const audio = fetchWav(t).catch(() => null); /* starts now, so the next sentence renders while this one plays */
+    chain = chain.then(async () => {
+      if(g !== gen) return;
+      const ab = await audio; if(g !== gen) return;
+      const ok = ab ? await play(ab) : false;
+      if(!ok && g === gen){ window.liTps = 18; await sayLocal(t); window.liTps = 0; }
+    }).finally(() => { pending--; settle(); });
+  };
+  return {
+    unlock,
+    feed(delta){
+      buf += delta;
+      for(;;){
+        const code = buf.indexOf('```');
+        if(code >= 0){ const close = buf.indexOf('```', code + 3); if(close < 0){ if(code > 0){ say(buf.slice(0, code)); buf = buf.slice(code); } return; } say(buf.slice(0, code) + ' I put the code in the chat. '); buf = buf.slice(close + 3); continue; }
+        const m = buf.match(/^([\s\S]{8,}?[.!?:;](?=\s)|[\s\S]*?\n\n)/);
+        if(!m){ if(buf.length > 260){ const cut = buf.lastIndexOf(' ', 220); say(buf.slice(0, cut > 40 ? cut : 220)); buf = buf.slice(cut > 40 ? cut : 220); } return; }
+        say(m[0]); buf = buf.slice(m[0].length);
+      }
+    },
+    end(){ if(buf.trim()) say(buf); buf = ''; },
+    finished(){ ended = true; return new Promise(r => { doneRes = r; settle(); }).finally(() => { ended = false; }); },
+    stop(){ gen++; buf = ''; try{ el.pause(); }catch(e){} if(playing){ URL.revokeObjectURL(playing); playing = null; } $('spk') && $('spk').classList.remove('talking'); if('speechSynthesis' in window) speechSynthesis.cancel(); window.liTps = 0; },
+    get busy(){ return pending > 0; }
+  };
+})();
+function listenOnce(){
+  return new Promise(async (res, rej) => {
+    try{ if(navigator.audioSession) navigator.audioSession.type = 'play-and-record'; }catch(e){}
+    try{ stream = stream || await navigator.mediaDevices.getUserMedia({audio:true}); }catch(e){ rej(new Error('mic')); return; }
+    const ac = new (window.AudioContext || window.webkitAudioContext)(), src = ac.createMediaStreamSource(stream), an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an);
+    const buf = new Uint8Array(an.fftSize), chunks = []; let spoke = false, quietSince = 0; const t0 = performance.now();
+    rec = new MediaRecorder(stream); rec.ondataavailable = e => e.data.size && chunks.push(e.data);
+    rec.onstop = () => { ac.close(); res(spoke ? new Blob(chunks, {type: rec.mimeType || 'audio/webm'}) : null); };
+    rec.start(250);
+    const loop = () => {
+      if(!rec || rec.state !== 'recording') return;
+      an.getByteTimeDomainData(buf); let sum = 0; for(const v of buf){ const d = (v - 128) / 128; sum += d * d; }
+      const rms = Math.sqrt(sum / buf.length), now = performance.now();
+      if(rms > 0.035){ spoke = true; quietSince = 0; } else if(spoke && !quietSince) quietSince = now;
+      if((spoke && quietSince && now - quietSince > 1300) || now - t0 > 30000 || !talkOn || muted) rec.stop(); else requestAnimationFrame(loop);
+    };
+    loop();
+  });
+}
+async function talkLoop(){
+  while(talkOn){
+    if(muted){ $('tstate').textContent = 'Muted'; $('wave').style.visibility = 'hidden'; await wait(400); continue; }
+    $('tstate').textContent = 'Listening'; $('wave').style.visibility = 'visible'; window.liTps = 0;
+    let blob; try{ blob = await listenOnce(); }catch(e){ $('tstate').textContent = 'Mic blocked'; $('tcap').textContent = 'Allow the microphone for this site, then try again.'; talkOn = false; break; }
+    if(!talkOn) break; if(!blob) continue;
+    $('tstate').textContent = 'Writing it down'; $('wave').style.visibility = 'hidden';
+    let text = '';
+    try{
+      const fd = new FormData(); fd.append('file', blob, 'talk.' + (/mp4/.test(blob.type) ? 'm4a' : /ogg/.test(blob.type) ? 'ogg' : 'webm'));
+      const r = await fetch('/api/v1/audio/transcriptions', {method:'POST', credentials:'same-origin', headers:token() ? {Authorization:'Bearer ' + token()} : {}, body:fd});
+      if(r.ok) text = ((await r.json()).text || '').trim();
+    }catch(e){}
+    if(!talkOn) break;
+    if(!/[a-z0-9]/i.test(text)){ $('tcap').textContent = "Didn't catch that."; continue; }
+    $('tcap').textContent = '“' + text + '”';
+    let c = chat();
+    if(!c){ c = {id:'c' + Date.now(), title:text.slice(0, 42), pinned:false, proj:S.curProj, model:'local', caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; }
+    c.msgs.push({r:'u', t:text, files:[], ts:Date.now()}); renderThread();
+    $('tstate').textContent = 'Li is thinking';
+    if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } /* phones route sound to the earpiece while the mic is open */
+    const reply = await respond(c, c.msgs.length, false);
+    if(!talkOn) break;
+    $('tcap').textContent = reply.replace(/```[\s\S]*?```/g, '[code in the chat]').replace(/[*_#`]/g, '').slice(0, 220);
+    $('tstate').textContent = 'Li'; await voice.finished();
+  }
+  window.liTps = 0;
+}
+$('mic').onclick = () => {
+  if(!navigator.mediaDevices || !window.MediaRecorder){ sheet(`<div class="sh">Talk mode</div><div class="note">This browser can't record audio. Try Safari or Chrome.</div>`); return; }
+  voice.unlock(); talkOn = true; muted = false; $('tcap').textContent = ''; document.body.classList.add('talking'); talkLoop();
+};
+$('tend').onclick = () => { talkOn = false; try{ rec && rec.state === 'recording' && rec.stop(); }catch(e){} voice.stop(); ctl && ctl.abort(); if(stream){ stream.getTracks().forEach(t => t.stop()); stream = null; } window.liTps = 0; document.body.classList.remove('talking'); };
+$('tmute').onclick = () => { muted = !muted; $('tmute').style.background = muted ? '#fff' : ''; $('tmute').style.color = muted ? '#120c09' : ''; };
+
+/* ---------- the speaker button up top: Li reads replies out loud ---------- */
+spkPaint();
+$('spk').onclick = () => {
+  S.voice.on = !S.voice.on; save(); spkPaint();
+  if(S.voice.on){ voice.stop(); voice.unlock(); voice.feed("I'll read my replies out loud."); voice.end(); toast('Li reads replies out loud'); }
+  else { voice.stop(); toast('Li is muted'); }
+};
+
+/* ---------- misc ---------- */
+function toEnd(soft){ if(soft && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 200) return; scroll.scrollTop = scroll.scrollHeight; }
+scroll.addEventListener('scroll', () => $('jump').classList.toggle('on', scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight > 160 && !!chat()));
+$('jump').onclick = () => toEnd();
+document.addEventListener('keydown', e => { if(e.key === 'Escape'){ closeS(); closeD(); document.body.classList.remove('popen'); } });
+const h = new Date().getHours();
+const greet = () => $('greet').textContent = (h < 5 ? 'Evening' : h < 12 ? 'Morning' : h < 17 ? 'Afternoon' : 'Evening') + (ME.first ? ', ' + ME.first : '');
+greet();
+
+/* ---------- sign in: invite-only accounts, password or Face ID (passkeys) ---------- */
+const BLURB = "Li runs on an <b>abliterated 27B model</b>: its built-in refusals have been stripped out, so it answers directly with no guardrails. The model runs privately on Zeid Data's own server. Web lookups go out only when web search is on for a chat, through a private search engine on that same server. <b>Invite only.</b>";
+const APPLE = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+const FID = APPLE ? 'Face ID' : 'a passkey';
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const ub64 = s => { s = s.replace(/-/g, '+').replace(/_/g, '/'); while(s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)).buffer; };
+let canPK = false;
+const pkReady = (async () => { try{ canPK = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); }catch(e){ canPK = false; } return canPK; })();
+const inviteFromUrl = () => { const m = location.search.match(/[?&]invite=([A-Za-z0-9-]+)/); return m ? m[1].toUpperCase() : ''; };
+async function j(path, opt){ const r = await api(path, opt); const x = await r.json().catch(() => ({})); if(!r.ok) throw new Error(typeof x.detail === 'string' ? x.detail : 'That didn\'t work (' + r.status + ').'); return x; }
+function signedIn(tok){ localStorage.token = tok; if(inviteFromUrl()) history.replaceState(null, '', location.pathname); document.body.classList.remove('locked'); closeS(); boot(true); }
+
+let loginOpts = null;
+async function prefetchLogin(){ try{ loginOpts = await j('/li-auth/passkey/login/options', {method:'POST', body:'{}'}); loginOpts.t = Date.now(); }catch(e){ loginOpts = null; } }
+async function faceLogin(){
+  const err = $('aerr'); err.textContent = '';
+  if(!loginOpts || Date.now() - loginOpts.t > 150000) await prefetchLogin();
+  if(!loginOpts){ err.textContent = 'Couldn\'t reach the box.'; return; }
+  const o = loginOpts.options, cid = loginOpts.challenge_id; loginOpts = null;
+  let cred;
+  try{
+    cred = await navigator.credentials.get({publicKey:{challenge:ub64(o.challenge), rpId:o.rpId, timeout:o.timeout, userVerification:'required', allowCredentials:[]}});
+  }catch(e){ err.textContent = e.name === 'NotAllowedError' ? '' : 'Face ID didn\'t work here. Use your password.'; prefetchLogin(); return; }
+  const r = cred.response;
+  try{
+    const x = await j('/li-auth/passkey/login/verify', {method:'POST', body:JSON.stringify({challenge_id:cid, credential:{id:cred.id, rawId:b64u(cred.rawId), type:cred.type,
+      response:{clientDataJSON:b64u(r.clientDataJSON), authenticatorData:b64u(r.authenticatorData), signature:b64u(r.signature), userHandle:r.userHandle ? b64u(r.userHandle) : null}, clientExtensionResults:{}}})});
+    signedIn(x.token);
+  }catch(e){ err.textContent = e.message; prefetchLogin(); }
+}
+
+function authSheet(mode){
+  if(mode === true) mode = 'first'; if(!mode) mode = inviteFromUrl() ? 'invite' : 'signin';
+  document.body.classList.add('locked');
+  const head = `<div class="authhead"><span class="zm spin" aria-hidden="true"></span><h2>${mode === 'invite' ? 'You\'re invited to Li' : mode === 'pending' ? 'Almost there' : mode === 'first' ? 'Set up Li' : 'Li'}</h2>${mode === 'pending' ? '' : `<p class="blurb">${BLURB}</p>`}</div>`;
+  if(mode === 'pending'){
+    sheet(head + `<div class="warnbox">Your account is waiting for approval. The admin will let you in.</div><div class="btns"><button class="btn" data-s="signout" style="width:100%;height:44px">Sign out</button></div>`); return;
+  }
+  const inv = mode === 'invite', first = mode === 'first';
+  sheet(head + `
+    ${mode === 'signin' ? `<button class="btn dark fid" id="fidb" type="button" style="display:none">${ic('face')}Sign in with ${FID}</button><div class="or" id="fidor" style="display:none">or use your email</div>` : ''}
+    <form id="authf">
+      ${inv ? `<input class="field" id="acode" autocomplete="one-time-code" autocapitalize="characters" placeholder="Invite code" value="${esc(inviteFromUrl())}" required>` : ''}
+      ${inv || first ? '<input class="field" id="an" autocomplete="name" placeholder="Your name" required>' : ''}
+      <input class="field" id="ae" type="email" autocomplete="username" placeholder="Email" required>
+      <input class="field" id="ap" type="password" autocomplete="${inv || first ? 'new-password' : 'current-password'}" placeholder="${inv || first ? 'Make a password (8+ characters)' : 'Password'}" minlength="${inv || first ? 8 : 1}" required>
+      <div class="note" id="aerr" style="color:var(--rust)" aria-live="polite"></div>
+      <div class="btns"><button class="btn dark" type="submit">${inv ? 'Create my account' : first ? 'Create admin account' : 'Sign in'}</button></div>
+    </form>
+    ${first ? '' : `<button class="alink" data-s="${inv ? 'tosignin' : 'toinvite'}" type="button">${inv ? 'I already have an account' : 'I have an invite'}</button>`}`);
+  if(mode === 'signin') pkReady.then(ok => { if(ok && $('fidb')){ $('fidb').style.display = ''; $('fidor').style.display = ''; $('fidb').onclick = faceLogin; prefetchLogin(); } });
+  if(inv && inviteFromUrl()) j('/li-auth/invite/check', {method:'POST', body:JSON.stringify({code:inviteFromUrl()})}).then(x => { if(x.email && $('ae')){ $('ae').value = x.email; } }).catch(e => { $('aerr') && ($('aerr').textContent = e.message); });
+  $('authf').onsubmit = async e => {
+    e.preventDefault(); $('aerr').textContent = '';
+    const email = $('ae').value.trim(), password = $('ap').value;
+    const btn = $('authf').querySelector('[type=submit]'); btn.disabled = true;
+    try{
+      if(inv){
+        const x = await j('/li-auth/invite/redeem', {method:'POST', body:JSON.stringify({code:$('acode').value.trim(), name:$('an').value.trim(), email, password})});
+        localStorage.token = x.token; S.offerFace = true; save(); signedIn(x.token); return;
+      }
+      const r = await fetch('/api/v1/auths/' + (first ? 'signup' : 'signin'), {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body:JSON.stringify(first ? {name:$('an').value.trim(), email, password} : {email, password})});
+      const x = await r.json().catch(() => ({}));
+      if(!r.ok || !x.token){ throw new Error(x.detail ? String(x.detail).slice(0, 160) : (x.mfa_required || x.mfa ? 'This account uses 2FA. Sign in at /auth once, then come back.' : 'That didn\'t work (' + r.status + ').')); }
+      S.offerFace = true; save(); signedIn(x.token);
+    }catch(err){ $('aerr').textContent = /fetch|load failed|network/i.test(err.message) ? 'Couldn\'t reach the box.' : err.message; btn.disabled = false; }
+  };
+}
+
+/* Face ID setup: a passkey kept in the phone's keychain, unlocked by Face ID */
+let regOpts = null;
+async function faceOffer(){
+  if(!(await pkReady)) return;
+  let mine = []; try{ mine = await j('/li-auth/passkeys'); }catch(e){ return; }
+  if(mine.length) return;
+  try{ regOpts = await j('/li-auth/passkey/register/options', {method:'POST', body:'{}'}); }catch(e){ return; }
+  sheet(`<div class="sh">${ic('face')} Use ${FID} next time?</div><div class="note">Sign in with a glance instead of your password. The key stays in your phone's keychain. The box only keeps a public key.</div>
+    <div class="btns"><button class="btn" data-s="close">Not now</button><button class="btn dark" data-s="faceon">Turn on ${FID}</button></div>`);
+}
+async function faceRegister(){
+  try{
+    const o = regOpts || await j('/li-auth/passkey/register/options', {method:'POST', body:'{}'}); regOpts = null;
+    const cred = await navigator.credentials.create({publicKey:{challenge:ub64(o.challenge), rp:o.rp, user:{...o.user, id:ub64(o.user.id)}, pubKeyCredParams:o.pubKeyCredParams, timeout:o.timeout,
+      excludeCredentials:(o.excludeCredentials || []).map(c => ({...c, id:ub64(c.id)})), authenticatorSelection:o.authenticatorSelection, attestation:'none'}});
+    const r = cred.response;
+    await j('/li-auth/passkey/register/verify', {method:'POST', body:JSON.stringify({name:APPLE ? (/iPhone/.test(navigator.userAgent) ? 'iPhone' : /iPad/.test(navigator.userAgent) ? 'iPad' : 'Mac') : /Android/.test(navigator.userAgent) ? 'Android phone' : 'This device',
+      credential:{id:cred.id, rawId:b64u(cred.rawId), type:cred.type, response:{clientDataJSON:b64u(r.clientDataJSON), attestationObject:b64u(r.attestationObject), transports:r.getTransports ? r.getTransports() : []}, clientExtensionResults:{}}})});
+    toast(FID + ' is on for this account'); return true;
+  }catch(e){ if(e.name !== 'NotAllowedError') toast(e.name === 'InvalidStateError' ? 'This device already has a key' : (e.message || 'Couldn\'t turn it on')); return false; }
+}
+async function faceSheet(){
+  let mine = []; try{ mine = await j('/li-auth/passkeys'); }catch(e){ toast(e.message); return; }
+  sheet(`<div class="sh">${ic('face')} ${APPLE ? 'Face ID' : 'Passkeys'}</div>
+    <div class="note">${mine.length ? 'These devices can sign in to your account without a password.' : 'No devices yet. Turn it on and sign in with a glance next time.'}</div>
+    ${mine.map(p => `<div class="prow"><div class="av">${ic('face')}</div><div class="who"><b>${esc(p.name)}</b><small>Added ${new Date(p.created_at * 1000).toLocaleDateString()}${p.last_used ? ' · last used ' + new Date(p.last_used * 1000).toLocaleDateString() : ''}</small></div><div class="pa"><button class="btn mini" data-s="pkdel" data-id="${esc(p.id)}">Remove</button></div></div>`).join('')}
+    ${canPK ? `<div class="btns" style="margin-top:12px"><button class="btn dark" data-s="faceadd">Add this device</button></div>` : '<div class="note">This browser can\'t use passkeys.</div>'}`);
+}
+
+/* ---------- voice settings ---------- */
+const VOICES = [['af_heart','Heart','warm, American'],['am_michael','Michael','calm, American'],['bf_emma','Emma','British'],['bm_george','George','British, deeper']];
+function voiceSheet(){
+  sheet(`<div class="sh">${ic('speak')} Li's voice</div>
+    <button class="opt" data-s="voicetoggle">${ic('speak')}<span>Read replies out loud<small>Same as the speaker button up top. Talk mode always speaks.</small></span><span class="sw ${S.voice.on ? 'on' : ''}"></span></button>
+    <div class="note" style="margin-top:6px">Voice</div>
+    <div class="vrow">${VOICES.map(v => `<button class="${S.voice.name === v[0] ? 'on' : ''}" data-s="voicepick" data-v="${v[0]}">${v[1]} <small style="color:var(--dim)">${v[2]}</small></button>`).join('')}</div>
+    <div class="note">${ic('lock')} Spoken by Kokoro, an open voice model running on the box. Nothing goes to an outside service.</div>`);
+}
+
+/* ---------- admin: invites and people ---------- */
+let adminTab = 'people';
+async function adminSheet(tab){
+  adminTab = tab || adminTab;
+  const seg = `<div class="sh">${ic('people')} People</div><div class="seg"><button class="${adminTab === 'people' ? 'on' : ''}" data-s="atab" data-t="people">Accounts</button><button class="${adminTab === 'invites' ? 'on' : ''}" data-s="atab" data-t="invites">Invites</button></div>`;
+  sheet(seg + '<div class="note">Loading…</div>');
+  try{
+    if(adminTab === 'people'){
+      const x = await j('/api/v1/users/?page=1'); const us = x.users || x || [];
+      sheet(seg + us.map(u => { const me = u.id === ME.id; return `<div class="prow"><div class="av">${esc((u.name || u.email || '?')[0].toUpperCase())}</div>
+        <div class="who"><b>${esc(u.name || '(no name)')}${me ? ' <span class="badge">you</span>' : ''}</b><small>${esc(u.email || '')}</small></div>
+        <span class="badge ${esc(u.role)}">${esc(u.role)}</span>
+        ${me ? '' : `<div class="pa"><button class="btn mini" data-s="uman" data-id="${esc(u.id)}">Manage</button></div>`}</div>`; }).join('') + `<div class="btns" style="margin-top:12px"><button class="btn dark" data-s="atab" data-t="invites">Invite someone</button></div>`);
+      window.__users = us;
+    } else {
+      const xs = await j('/li-auth/invites');
+      sheet(seg + `<div class="btns" style="justify-content:flex-start;margin-bottom:8px"><button class="btn dark" data-s="invnew">New invite</button></div>` +
+        (xs.length ? xs.map(i => `<div class="prow"><div class="av">${ic('tag')}</div><div class="who"><b>${esc(i.label || 'Invite')}</b><small>${i.status === 'used' ? 'Joined as ' + esc(i.used_email || '') : i.email ? 'For ' + esc(i.email) : 'Anyone with the link'} · ${i.status === 'waiting' ? 'ends ' + new Date(i.expires_at * 1000).toLocaleDateString() : ''}</small></div>
+          <span class="badge ${esc(i.status)}">${esc(i.status)}</span>${i.status === 'waiting' ? `<div class="pa"><button class="btn mini" data-s="invdel" data-id="${esc(i.id)}">Cancel</button></div>` : ''}</div>`).join('') : '<div class="note">No invites yet. An invite is a one-time link. Only someone with it can make an account.</div>'));
+    }
+  }catch(e){ sheet(seg + `<div class="warnbox">${esc(e.message)}</div>`); }
+}
+function inviteForm(){
+  sheet(`<div class="sh">New invite</div><div class="note">Makes a one-time link. It works once, then it's used up.</div>
+    <input class="field" id="ilab" placeholder="Who is it for? (just a label)" maxlength="80">
+    <input class="field" id="iem" type="email" placeholder="Their email (optional, locks the invite to it)">
+    <div class="note">Link works for</div><div class="vrow">${[1,7,30].map(d => `<button class="${d === 7 ? 'on' : ''}" data-s="idays" data-d="${d}">${d} day${d > 1 ? 's' : ''}</button>`).join('')}</div>
+    <div class="note" id="ierr" style="color:var(--rust)"></div>
+    <div class="btns"><button class="btn" data-s="atab" data-t="invites">Back</button><button class="btn dark" data-s="invmake">Make invite</button></div>`);
+}
+function inviteMade(x){
+  sheet(`<div class="sh">Invite ready${x.label ? ' for ' + esc(x.label) : ''}</div>
+    <div class="note">Send them this link. It works once${x.email ? ', only for ' + esc(x.email) : ''}, until ${new Date(x.expires_at * 1000).toLocaleDateString()}. You won't see the code again after you close this.</div>
+    <div class="linkbox" id="ilink">${esc(x.link)}</div><div class="note" style="text-align:center">or the code</div><div class="bigcode">${esc(x.code)}</div>
+    <div class="btns"><button class="btn" data-s="atab" data-t="invites">Done</button>${navigator.share ? '<button class="btn" data-s="invshare">Share</button>' : ''}<button class="btn dark" data-s="invcopy">Copy link</button></div>`);
+  window.__inv = x;
+}
+function userSheet(id){
+  const u = (window.__users || []).find(x => x.id === id); if(!u) return;
+  sheet(`<div class="sh">${esc(u.name || u.email)}</div><div class="note">${esc(u.email)} · <span class="badge ${esc(u.role)}">${esc(u.role)}</span></div>
+    ${u.role === 'pending' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="user">${ic('check')}<span>Approve<small>Let them use Li</small></span></button>` : ''}
+    ${u.role !== 'admin' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="admin">${ic('people')}<span>Make admin<small>Can invite and manage people</small></span></button>` : `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="user">${ic('people')}<span>Make a regular user<small>Removes admin rights</small></span></button>`}
+    ${u.role === 'user' ? `<button class="opt" data-s="urole" data-id="${esc(id)}" data-r="pending">${ic('lock')}<span>Pause access<small>They can't sign in until you approve them again</small></span></button>` : ''}
+    <button class="opt danger" data-s="udel" data-id="${esc(id)}">${ic('x')}<span>Remove account<small>Deletes the account and its chats on the box</small></span></button>
+    <div class="btns"><button class="btn" data-s="atab" data-t="people">Back</button></div>`);
+}
+async function setRole(id, role){
+  const u = (window.__users || []).find(x => x.id === id); if(!u) return;
+  try{ await j(`/api/v1/users/${id}/update`, {method:'POST', body:JSON.stringify({role, name:u.name, email:u.email, profile_image_url:u.profile_image_url || '/user.png'})}); toast(role === 'admin' ? 'Now an admin' : role === 'pending' ? 'Access paused' : 'Done'); adminSheet('people'); }
+  catch(e){ toast(e.message); }
+}
+let invDays = 7;
+$('sheetIn').addEventListener('click', async e => {
+  const b = e.target.closest('[data-s]'); if(!b) return; const s = b.dataset.s;
+  if(s === 'toinvite') authSheet('invite');
+  else if(s === 'tosignin'){ history.replaceState(null, '', location.pathname); authSheet('signin'); }
+  else if(s === 'faceon'){ b.disabled = true; await faceRegister(); closeS(); }
+  else if(s === 'faceadd'){ b.disabled = true; await faceRegister(); faceSheet(); }
+  else if(s === 'pkdel'){ try{ await j('/li-auth/passkeys/' + encodeURIComponent(b.dataset.id), {method:'DELETE'}); toast('Removed'); }catch(err){ toast(err.message); } faceSheet(); }
+  else if(s === 'faceset') faceSheet();
+  else if(s === 'voiceset') voiceSheet();
+  else if(s === 'voicetoggle'){ S.voice.on = !S.voice.on; save(); spkPaint(); b.querySelector('.sw').classList.toggle('on', S.voice.on); if(S.voice.on){ voice.unlock(); voice.feed('Okay, I\'ll read my replies out loud.'); voice.end(); } else voice.stop(); }
+  else if(s === 'voicepick'){ S.voice.name = b.dataset.v; save(); voice.stop(); voice.unlock(); voice.feed('Hi, this is how I sound.'); voice.end(); voiceSheet(); }
+  else if(s === 'people') adminSheet('people');
+  else if(s === 'atab') adminSheet(b.dataset.t);
+  else if(s === 'invnew'){ invDays = 7; inviteForm(); }
+  else if(s === 'idays'){ invDays = +b.dataset.d; b.parentNode.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); }
+  else if(s === 'invmake'){ b.disabled = true; try{ inviteMade(await j('/li-auth/invites', {method:'POST', body:JSON.stringify({label:$('ilab').value.trim(), email:$('iem').value.trim(), days:invDays})})); }catch(err){ $('ierr').textContent = err.message; b.disabled = false; } }
+  else if(s === 'invcopy') copy(window.__inv.link);
+  else if(s === 'invshare'){ try{ await navigator.share({title:'Your invite to Li', text:'Here\'s your invite to Li:', url:window.__inv.link}); }catch(err){} }
+  else if(s === 'invdel'){ try{ await j('/li-auth/invites/' + b.dataset.id, {method:'DELETE'}); toast('Invite cancelled'); }catch(err){ toast(err.message); } adminSheet('invites'); }
+  else if(s === 'uman') userSheet(b.dataset.id);
+  else if(s === 'urole') setRole(b.dataset.id, b.dataset.r);
+  else if(s === 'udel'){ const u = (window.__users || []).find(x => x.id === b.dataset.id); sheet(`<div class="sh">Remove ${esc(u ? u.name || u.email : 'this account')}?</div><div class="warnbox">Their account and everything it saved on the box are deleted. This can't be undone. Chats saved in their own browser stay there.</div><div class="btns"><button class="btn" data-s="uman" data-id="${esc(b.dataset.id)}">Keep</button><button class="btn warn" data-s="udodel" data-id="${esc(b.dataset.id)}">Remove for good</button></div>`); }
+  else if(s === 'udodel'){ try{ await j('/api/v1/users/' + b.dataset.id, {method:'DELETE'}); toast('Account removed'); }catch(err){ toast(err.message); } adminSheet('people'); }
+});
+
+async function signOut(){ voice.stop(); try{ await api('/api/v1/auths/signout', {method:'POST'}); }catch(e){} delete localStorage.token; closeS(); authSheet('signin'); }
+async function boot(fresh){
+  try{
+    const r = await api('/api/v1/auths/');
+    if(!r.ok){
+      const cfg = await fetch('/api/config', {credentials:'same-origin'}).then(x => x.json()).catch(() => ({}));
+      authSheet(cfg.onboarding ? 'first' : null); return;
+    }
+    const u = await r.json(); ME = {name:u.name || '', first:(u.name || '').split(' ')[0], id:u.id || '', role:u.role || ''};
+    if(ME.role === 'pending'){ authSheet('pending'); return; }
+    $('meName').textContent = ME.name || 'You'; $('meAv').textContent = (ME.name || 'Y')[0].toUpperCase(); greet();
+    try{ const n = await fetch('/li/notes.json', {credentials:'same-origin', cache:'no-store'}).then(x => x.json()); MEM = (n.notes || []).map(o => [o.text, o.kind || '']); }catch(e){ MEM = []; }
+    const m = await api('/api/models').then(x => x.json()).catch(() => ({}));
+    const ids = (m.data || []).map(x => x.id);
+    MODEL = ids.find(x => /qwen3\.8|abliterated/i.test(x)) || ids[0] || '';
+    if(!MODEL) toast('No model found on the box');
+    loadConn().then(() => renderThread(true));
+    renderThread();
+    if(fresh && S.offerFace){ S.offerFace = false; save(); faceOffer(); }
+  }catch(e){ toast('Couldn\'t reach the box'); }
+}
+renderThread(); updateSend(); boot();
+}
+</script>
+
+<script src="/li/vendor/three.min.js"></script>
+<script src="/li/vendor/RoomEnvironment.js"></script>
+<script>
+{
+/* Zeid Data 3D Z: outline from the brand mark (mark.json, the same outline the 3D renders are extruded from) */
+const MARK = {"w":0.95817,"h":1.0,"o":[[0.1144,0.826],[0.1018,0.8478],[0.0964,0.8597],[0.0917,0.8721],[0.0858,0.8924],[0.0707,0.9554],[0.0707,0.9633],[0.072,0.9705],[0.0749,0.9778],[0.0792,0.9846],[0.0823,0.9881],[0.0885,0.9931],[0.0955,0.9969],[0.1024,0.999],[0.1109,1.0],[0.8255,1.0],[0.8283,0.9994],[0.8307,0.9979],[0.8322,0.9955],[0.8328,0.9928],[0.8328,0.7319],[0.8322,0.7291],[0.8307,0.7268],[0.8263,0.7247],[0.4379,0.7248],[0.4263,0.7276],[0.416,0.7336],[0.4099,0.7398],[0.4039,0.75],[0.4012,0.7609],[0.4011,0.7688],[0.4028,0.7773],[0.4059,0.7846],[0.4104,0.7912],[0.4187,0.7987],[0.4263,0.8028],[0.4339,0.8051],[0.4417,0.8058],[0.7516,0.8058],[0.7516,0.9188],[0.1628,0.9188],[0.1694,0.8959],[0.1772,0.8788],[0.1884,0.8617],[0.1952,0.857],[0.2012,0.8508],[0.2054,0.844],[0.2083,0.8363],[0.2155,0.8282],[0.2363,0.8074],[0.2557,0.7914],[0.2765,0.7775],[0.3045,0.7626],[0.3314,0.7509],[0.3655,0.7386],[0.4067,0.7261],[0.4374,0.7185],[0.4822,0.7108],[0.5782,0.6987],[0.6917,0.6821],[0.7282,0.6754],[0.7586,0.6675],[0.7812,0.6594],[0.8022,0.6503],[0.8219,0.6401],[0.8373,0.6307],[0.8543,0.6187],[0.8704,0.6051],[0.8855,0.5902],[0.8975,0.5762],[0.9105,0.5581],[0.924,0.5353],[0.9354,0.5117],[0.9446,0.4877],[0.9513,0.4644],[0.9554,0.4431],[0.9579,0.4183],[0.9582,0.3935],[0.9557,0.365],[0.9505,0.3381],[0.9436,0.3171],[0.9337,0.2956],[0.9177,0.2687],[0.8876,0.2255],[0.8694,0.2027],[0.8439,0.174],[0.8566,0.1522],[0.8619,0.1403],[0.8666,0.1279],[0.8725,0.108],[0.8819,0.0672],[0.8871,0.0486],[0.8877,0.0374],[0.8861,0.0289],[0.8814,0.0187],[0.876,0.0119],[0.8699,0.0069],[0.8629,0.0031],[0.8553,0.0008],[0.8475,0.0],[0.1328,0.0],[0.13,0.0006],[0.1277,0.0021],[0.1261,0.0045],[0.1255,0.0073],[0.1255,0.2681],[0.1261,0.2709],[0.1277,0.2732],[0.1321,0.2753],[0.5205,0.2752],[0.532,0.2724],[0.5423,0.2664],[0.5504,0.2576],[0.5545,0.25],[0.5567,0.2424],[0.5573,0.2312],[0.5558,0.2233],[0.5524,0.2154],[0.5458,0.2064],[0.5397,0.2013],[0.5327,0.1974],[0.5244,0.1949],[0.5167,0.1942],[0.2067,0.1942],[0.2067,0.0812],[0.7955,0.0812],[0.789,0.1041],[0.7812,0.1212],[0.77,0.1383],[0.7631,0.143],[0.7571,0.1492],[0.7529,0.156],[0.75,0.1637],[0.7428,0.1719],[0.722,0.1926],[0.6993,0.2111],[0.6781,0.2247],[0.6495,0.2394],[0.6222,0.2509],[0.5877,0.2631],[0.5517,0.2739],[0.5209,0.2815],[0.4761,0.2892],[0.3801,0.3013],[0.2666,0.318],[0.2306,0.3245],[0.2047,0.331],[0.1855,0.3374],[0.1644,0.3459],[0.1475,0.3539],[0.1289,0.3643],[0.1139,0.3741],[0.1002,0.3844],[0.0848,0.3978],[0.0723,0.4104],[0.0554,0.4309],[0.0386,0.457],[0.0247,0.4844],[0.0183,0.4998],[0.0127,0.5157],[0.0053,0.5438],[0.0014,0.5692],[0.0,0.5977],[0.0015,0.6263],[0.0052,0.6503],[0.0105,0.671],[0.0179,0.6905],[0.0287,0.7118],[0.0446,0.7374],[0.0728,0.7772],[0.0891,0.7975],[0.1144,0.826]],"hs":[[[0.1662,0.7622],[0.1489,0.7426],[0.136,0.7263],[0.1101,0.6893],[0.0966,0.6669],[0.0901,0.6529],[0.086,0.6396],[0.0826,0.6208],[0.0813,0.6035],[0.0819,0.5801],[0.0853,0.5575],[0.0918,0.535],[0.1003,0.5143],[0.1124,0.4916],[0.1247,0.474],[0.1382,0.459],[0.1559,0.4439],[0.1762,0.4306],[0.1969,0.4203],[0.2207,0.411],[0.2433,0.4048],[0.2792,0.3981],[0.3857,0.3825],[0.4751,0.3713],[0.5187,0.3646],[0.5563,0.3566],[0.6126,0.3403],[0.6458,0.3288],[0.6727,0.3179],[0.6986,0.3058],[0.7185,0.2952],[0.7374,0.2834],[0.7559,0.27],[0.7727,0.2561],[0.7922,0.2378],[0.8075,0.2551],[0.8206,0.2714],[0.8531,0.3183],[0.8618,0.3332],[0.8682,0.347],[0.8724,0.3605],[0.8757,0.3792],[0.8771,0.3965],[0.8769,0.4141],[0.8746,0.4342],[0.8702,0.4534],[0.8632,0.4739],[0.8538,0.4944],[0.8425,0.5137],[0.8318,0.5284],[0.8181,0.543],[0.8024,0.5561],[0.7822,0.5694],[0.7614,0.5797],[0.7376,0.589],[0.715,0.5952],[0.6791,0.6019],[0.5727,0.6175],[0.4833,0.6288],[0.4396,0.6354],[0.402,0.6434],[0.3457,0.6597],[0.3177,0.6693],[0.2906,0.68],[0.2648,0.6916],[0.2442,0.7024],[0.225,0.7139],[0.2068,0.7266],[0.186,0.7435],[0.1662,0.7622]]]};
+const RUST = ['#9c3a16','#c0521f','#7a2a0e','#b04519','#d06a34','#8a3213'];
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* flat SVG fallback, filled with a metallic rust gradient */
+const pts = a => 'M' + a.map(([x,y]) => (x*1000).toFixed(0)+' '+(y*1000).toFixed(0)).join(' L') + 'Z';
+const svgMark = '<svg viewBox="-20 -20 998 1040" aria-hidden="true"><defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1">'
+  + '<stop offset="0" stop-color="#f0a070"/><stop offset=".35" stop-color="#b4451e"/><stop offset=".6" stop-color="#7a2a0e"/><stop offset=".8" stop-color="#d0662c"/><stop offset="1" stop-color="#8f3312"/></linearGradient></defs>'
+  + '<path fill="url(#rg)" fill-rule="evenodd" d="' + pts(MARK.o) + MARK.hs.map(pts).join('') + '"/></svg>';
+
+let gl = null, still = null, raf = 0;
+const live = new Set();
+function dress(el){
+  if(el.dataset.z) return; el.dataset.z = 1;
+  const anim = el.classList.contains('spin') || el.classList.contains('idle');
+  if(gl && anim && !reduce){ const c = document.createElement('canvas'); el.replaceChildren(c); live.add(el); tick(); }
+  else if(gl && still){ const i = new Image(); i.src = still; i.alt = ''; el.replaceChildren(i); }
+  else el.innerHTML = svgMark;
+}
+const dressAll = () => document.querySelectorAll('.zm').forEach(dress);
+new MutationObserver(() => { dressAll(); for(const el of live) if(!el.isConnected) live.delete(el); }).observe(document.body, {childList:true, subtree:true});
+dressAll();
+
+/* real 3D: extruded mark, shiny rust metal */
+try{
+  if(!window.THREE) throw 0;
+  const ren = new THREE.WebGLRenderer({alpha:true, antialias:true, preserveDrawingBuffer:true});
+  const S = 512; ren.setSize(S, S, false); ren.outputEncoding = THREE.sRGBEncoding;
+  const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, .1, 50); cam.position.z = 4.4;
+  let env = null; try{ env = new THREE.PMREMGenerator(ren).fromScene(new THREE.RoomEnvironment(), .04).texture; }catch(e){}
+  const path = (P, a) => { P.moveTo(a[0][0]-MARK.w/2, MARK.h/2-a[0][1]); for(let i=1;i<a.length;i++) P.lineTo(a[i][0]-MARK.w/2, MARK.h/2-a[i][1]); P.closePath(); return P; };
+  const sh = path(new THREE.Shape(), MARK.o); MARK.hs.forEach(h => sh.holes.push(path(new THREE.Path(), h)));
+  const geo = new THREE.ExtrudeGeometry(sh, {depth:.16, bevelEnabled:true, bevelThickness:.025, bevelSize:.012, bevelSegments:6, curveSegments:1});
+  geo.translate(0, 0, -.08); geo.computeVertexNormals();
+  const mat = new THREE.MeshPhysicalMaterial({color:new THREE.Color(RUST[0]).convertSRGBToLinear(), metalness:.78, roughness:.3, clearcoat:.7, clearcoatRoughness:.12, envMap:env, envMapIntensity:1.5});
+  const mesh = new THREE.Mesh(geo, mat); mesh.scale.setScalar(1.75); scene.add(mesh);
+  scene.add(new THREE.AmbientLight(0xffffff, env ? .2 : .7));
+  const k = new THREE.DirectionalLight(0xfff1e0, 1.5); k.position.set(-1.5, 2.5, 6); scene.add(k);
+  const r = new THREE.DirectionalLight(0xffb27a, .6); r.position.set(4, -2, -3); scene.add(r);
+  const ca = new THREE.Color(), cb = new THREE.Color();
+  function pose(ry, rx, t){
+    mesh.rotation.set(rx, ry, 0);
+    if(t == null) mat.color.set(RUST[0]).convertSRGBToLinear();
+    else { const f = t % RUST.length, i = Math.floor(f), m = f - i;
+      mat.color.copy(ca.set(RUST[i]).convertSRGBToLinear().lerp(cb.set(RUST[(i+1)%RUST.length]).convertSRGBToLinear(), m)); }
+    ren.render(scene, cam);
+  }
+  pose(-.3, .14); still = ren.domElement.toDataURL('image/png');
+  document.getElementById('fav').href = still;
+  gl = {ren, pose};
+  document.querySelectorAll('.zm').forEach(el => { delete el.dataset.z; dress(el); });
+}catch(e){ gl = null; }
+
+function tick(){ if(!raf && live.size) raf = requestAnimationFrame(frame); }
+let lastT = 0;
+function frame(now){
+  raf = 0; if(!gl || !live.size){ lastT = 0; return; }
+  const t = now/1000, dt = Math.min(.1, lastT ? t - lastT : 0); lastT = t;
+  /* live Z: spin speed follows the model's tokens per second (window.liTps); 0 = still reading the prompt */
+  const tps = window.liTps || 0, speed = tps ? .9 + tps*.24 : 2.6;
+  for(const el of live){
+    const c = el.firstChild, w = el.clientWidth, d = Math.min(devicePixelRatio || 1, 2);
+    if(!w) continue;
+    if(c.width !== Math.round(w*d)){ c.width = c.height = Math.round(w*d); }
+    if(el.classList.contains('spin')){ el._a = (el._a||0) + dt*speed; gl.pose(el._a, .12, t*1.6); }   /* thinking: spin and roll through the rust tones */
+    else gl.pose(Math.sin(t*.6)*.55, .14 + Math.sin(t*.4)*.05);       /* resting: slow sway so it reads as metal */
+    const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); x.drawImage(gl.ren.domElement, 0, 0, c.width, c.height);
+  }
+  tick();
+}
+}
+</script>
+</body>
+</html>
