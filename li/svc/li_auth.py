@@ -8,11 +8,6 @@ from datetime import timedelta
 
 sys.path.insert(1, os.environ.get('LI_BACKEND', '/app/backend'))  # Open WebUI's own package
 sys.path.append(os.environ.get('LI_PYLIB', '/app/backend/data/li/pylib'))
-try:
-    open('/tmp/li_auth.pid', 'w').write(str(os.getpid()))
-except Exception:
-    pass
-
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, Response

@@ -14,7 +14,7 @@ TS=$(date -u +%Y%m%dT%H%M%SZ); LOG=/tmp/li_accounts_${TS}.log
 exec > >(tee -a "$LOG") 2>&1
 ok(){ echo "PASS  $1"; }; bad(){ echo "FAIL  $1"; echo "DECISION=$2"; exit 1; }
 W=$(mktemp -d); cd "$W" || exit 1
-for f in li/svc/li_auth.py li/svc/li_tts.py; do curl -fsSL --max-time 30 "$RAW/$f" -o "$(basename $f)" || bad "download $f" ABORT_DOWNLOAD; done
+for f in li/svc/li_auth.py li/svc/li_auth_stop.py li/svc/li_tts.py; do curl -fsSL --max-time 30 "$RAW/$f" -o "$(basename $f)" || bad "download $f" ABORT_DOWNLOAD; done
 
 # 1. voice
 sudo mkdir -p /opt/li-tts
@@ -43,15 +43,16 @@ curl -sf 127.0.0.1:3012/health >/dev/null && ok "voice on 127.0.0.1:3012" || bad
 # 2. li-auth inside the open-webui container
 sudo docker exec open-webui sh -c 'mkdir -p /app/backend/data/li && pip -q install --no-deps --target /app/backend/data/li/pylib webauthn==3.0.1 cbor2 pyasn1 pyasn1-modules pyOpenSSL' 2>&1 | grep -v -i notice
 sudo docker cp li_auth.py open-webui:/app/backend/data/li/li_auth.py || bad "copy li_auth" ABORT_COPY
+sudo docker cp li_auth_stop.py open-webui:/app/backend/data/li/li_auth_stop.py || bad "copy li_auth_stop" ABORT_COPY
 sudo tee /etc/systemd/system/li-auth.service >/dev/null <<U
 [Unit]
 Description=Li sign-in helper (invites, passkeys, voice relay), runs inside open-webui
 After=docker.service
 Requires=docker.service
 [Service]
-ExecStartPre=-/usr/bin/docker exec open-webui sh -c 'kill \$\$(cat /tmp/li_auth.pid) 2>/dev/null; sleep 1; true'
+ExecStartPre=-/usr/bin/docker exec open-webui python /app/backend/data/li/li_auth_stop.py
 ExecStart=/usr/bin/docker exec -e LI_PORT=3010 -e LI_RP_ID=$DOMAIN -e LI_ORIGIN=https://$DOMAIN -e LI_OWUI=http://127.0.0.1:3000 -e LI_TTS=http://127.0.0.1:3012 open-webui sh -c 'echo \$\$\$\$ > /tmp/li_auth.pid; exec python /app/backend/data/li/li_auth.py'
-ExecStop=-/usr/bin/docker exec open-webui sh -c 'kill \$\$(cat /tmp/li_auth.pid) 2>/dev/null; true'
+ExecStop=-/usr/bin/docker exec open-webui python /app/backend/data/li/li_auth_stop.py
 Restart=always
 RestartSec=5
 [Install]

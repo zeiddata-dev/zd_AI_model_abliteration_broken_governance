@@ -206,7 +206,15 @@ async def exif(req: Request):
         except Exception: pass
     tags = {k: v for k, v in tags.items() if not k.startswith('System:') and k not in ('SourceFile',) and not (isinstance(v, str) and v.startswith('base64:'))}
     gps = None
-    lat = next((v for k, v in tags.items() if k.endswith('GPSLatitude')), None); lon = next((v for k, v in tags.items() if k.endswith('GPSLongitude')), None)
+    def coord(name):
+        # Composite tags are signed; GPS-group tags are unsigned and need their N/S/E/W ref.
+        v = tags.get('Composite:' + name)
+        if isinstance(v, (int, float)): return v
+        v = next((x for k, x in tags.items() if k.endswith(':' + name)), None)
+        if not isinstance(v, (int, float)): return None
+        ref = str(next((x for k, x in tags.items() if k.endswith(':' + name + 'Ref')), '')).upper()
+        return -abs(v) if ref.startswith(('S', 'W')) else v
+    lat, lon = coord('GPSLatitude'), coord('GPSLongitude')
     if isinstance(lat, (int, float)) and isinstance(lon, (int, float)): gps = {'lat': lat, 'lon': lon, 'map': f'https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=17/{lat}/{lon}'}
     pick = lambda *names: next((tags[k] for k in tags for n in names if k.endswith(':' + n)), None)
     key = {'camera': ' '.join(str(x) for x in [pick('Make'), pick('Model')] if x) or None, 'taken': pick('DateTimeOriginal', 'CreateDate'),
