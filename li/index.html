@@ -121,7 +121,16 @@ svg.i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stro
 .round{width:38px;height:38px;border-radius:50%;border:0;background:var(--soft);display:grid;place-items:center;flex:none}
 .chip{height:38px;border:0;border-radius:19px;background:var(--soft);padding:0 12px;font-size:14px;display:flex;align-items:center;gap:6px;white-space:nowrap}
 .chip i{font-style:normal;color:var(--dim)}
-.chip.webc svg.i{width:16px;height:16px}
+.chip.webc svg.i,.chip.toolc svg.i{width:16px;height:16px}
+.comp .row{overflow-x:auto;scrollbar-width:none}
+.tmsg{font-family:var(--sans);border:1px solid var(--line);background:var(--card);border-radius:14px;padding:10px 12px;margin:12px 0}
+.tmsg .th{display:flex;align-items:center;gap:8px;font-size:14px}.tmsg .th svg.i{width:16px;height:16px;color:var(--rust)}
+.tmsg .th span{color:var(--ink2);font-family:var(--mono);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmsg .ts{font-size:14px;margin:6px 0 4px;line-height:1.45}.tmsg .te{font-size:11.5px;color:var(--dim);font-family:var(--mono)}
+.tmsg .acts{gap:6px;margin-top:8px}
+.conn{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:0 0 10px;background:var(--bg)}
+.conn .ch{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.evraw{font:12px/1.5 var(--mono);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:40dvh;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .chip.webc.on{background:#e4efe7;color:var(--home)}
 .wsrc{font-family:var(--sans);margin:10px 0 2px;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:6px}
 .wsrc .wl{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dim);padding:4px 6px 6px}
@@ -334,6 +343,8 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
         <button type="button" class="round" id="plus" aria-label="Add photos or files"></button>
         <button type="button" class="chip" id="model">Li 27B <i>local</i></button>
         <button type="button" class="chip webc" id="webc" aria-pressed="true">Web</button>
+        <button type="button" class="chip toolc" id="toolc" style="display:none">Tools</button>
+        <button type="button" class="chip toolc" id="casec" style="display:none">Case</button>
         <button type="button" class="round mic" id="mic" aria-label="Talk mode"></button>
         <button type="submit" class="send hide" id="send" aria-label="Send"><span class="stop"></span></button>
       </div>
@@ -391,6 +402,7 @@ textarea.field{resize:vertical;min-height:96px;line-height:1.45}
 <input type="file" id="fimg" accept="image/*" multiple hidden>
 <input type="file" id="ffile" accept=".pdf,.csv,.xlsx,.xls,.txt,.md,.docx,.json" multiple hidden>
 <input type="file" id="fproj" multiple hidden>
+<input type="file" id="fexif" accept="image/*,.heic,.heif,.tif,.tiff,.dng" hidden>
 <div class="toast" id="toast" role="status"></div>
 <script>
 {
@@ -449,17 +461,19 @@ const CHANNELS = [
   src:[['FBI IC3 (Internet Crime Complaint Center)','https://www.ic3.gov/','FBI complaint intake and annual internet crime reports'],['FTC ReportFraud','https://reportfraud.ftc.gov/','Where consumer fraud is reported in the US'],['ACFE Fraud Resources','https://www.acfe.com/fraud-resources','Association of Certified Fraud Examiners guides and fraud tree'],['US Postal Inspection Service','https://www.uspis.gov/','Mail theft and check fraud'],['FinCEN','https://www.fincen.gov/','US Treasury financial crimes unit, alerts and SAR guidance'],['CFPB','https://www.consumerfinance.gov/','Consumer finance complaints and scam guides'],['Wikipedia: Cheque fraud','https://en.wikipedia.org/wiki/Cheque_fraud','Check fraud types: kiting, washing, forgery']]},
  {name:'Drugs', instr:"Channel: Drugs. Case work involving drugs and controlled substances. Give accurate pharmacology: what the substance is, street and chemical names, effects, documented dosing ranges, interactions, overdose signs and legal schedule (federal, and Texas when it matters). Help identify substances from descriptions, slang, packaging, pill imprints and lab results. Lead with the safety facts when someone's health could be at risk. Say which source a fact comes from when it matters.",
   src:[['Erowid','https://erowid.org/','Substance vaults: effects, dosing, experience reports'],['DrugsData (Erowid lab testing)','https://www.drugsdata.org/','Lab results for tested street samples'],['DEA Drug Fact Sheets','https://www.dea.gov/factsheets','Federal descriptions, street names and schedules'],['NIDA','https://nida.nih.gov/','National Institute on Drug Abuse research and drug facts'],['PubChem','https://pubchem.ncbi.nlm.nih.gov/','Chemical structures, identifiers and toxicity'],['UNODC','https://www.unodc.org/','UN drug and crime data, World Drug Report'],['Wikipedia: Psychoactive drug','https://en.wikipedia.org/wiki/Psychoactive_drug','Overview and drug classes']]},
- {name:'OSINT', instr:"Channel: OSINT. Open-source investigation. Plan searches step by step, name the exact tools and sources to use, and explain what each result does and doesn't prove. Keep a clean chain for every finding: source, date found, how it ties to the subject. Verify before linking identities and rate confidence as confirmed, likely or unconfirmed. Stick to public information.",
+ {name:'OSINT', kind:'osint', instr:"Channel: OSINT. Open-source investigation. Plan searches step by step, name the exact tools and sources to use, and explain what each result does and doesn't prove. Keep a clean chain for every finding: source, date found, how it ties to the subject. Verify before linking identities and rate confidence as confirmed, likely or unconfirmed. Stick to public information.",
   src:[['OSINT Framework','https://osintframework.com/','Tool map by category'],['Bellingcat Online Investigations Toolkit','https://bellingcat.gitbook.io/toolkit','Vetted tools with how-to notes'],['Bellingcat how-to guides','https://www.bellingcat.com/category/resources/how-tos/','Step-by-step investigation methods'],['IntelTechniques','https://inteltechniques.com/','Michael Bazzell OSINT tools and resources'],['Awesome OSINT','https://github.com/jivoi/awesome-osint','Large curated list of OSINT tools']]},
  {name:'Cybercrime', instr:"Channel: Cybercrime. Intrusions, malware, account takeover, phishing, ransomware and crypto theft. Map activity to MITRE ATT&CK techniques, pull indicators into clean lists (IPs, domains, hashes, emails, wallets), build timelines from logs, and write detections (Sigma, KQL, SPL) when useful. Keep observed evidence separate from inference.",
   src:[['MITRE ATT&CK','https://attack.mitre.org/','Adversary tactics and techniques'],['CISA Known Exploited Vulnerabilities','https://www.cisa.gov/known-exploited-vulnerabilities-catalog','CVEs exploited in the wild'],['abuse.ch','https://abuse.ch/','Malware, botnet and URL threat feeds'],['VirusTotal','https://www.virustotal.com/','File, URL, domain and IP reputation'],['FBI IC3','https://www.ic3.gov/','Cybercrime complaints and PSAs']]},
  {name:'Money laundering', instr:"Channel: Money laundering. Follow the money: structuring, shell companies, trade-based laundering, crypto mixing, money mules. Lay out entities, accounts and transfers as a flow, name the typologies (FinCEN and FATF terms), and list the sanctions and company-registry checks to run. Mark every link as documented or inferred.",
-  src:[['FATF','https://www.fatf-gafi.org/','Global AML standards, typologies and country reports'],['FinCEN Advisories','https://www.fincen.gov/resources/advisoriesbulletinsfact-sheets/advisories','Red-flag advisories by scheme'],['OFAC Sanctions Search','https://sanctionssearch.ofac.treas.gov/','US sanctions list lookup'],['OpenCorporates','https://opencorporates.com/','Company records across jurisdictions'],['ICIJ Offshore Leaks','https://offshoreleaks.icij.org/','Offshore entities from the Panama and Pandora papers']]}
+  src:[['FATF','https://www.fatf-gafi.org/','Global AML standards, typologies and country reports'],['FinCEN Advisories','https://www.fincen.gov/resources/advisoriesbulletinsfact-sheets/advisories','Red-flag advisories by scheme'],['OFAC Sanctions Search','https://sanctionssearch.ofac.treas.gov/','US sanctions list lookup'],['OpenCorporates','https://opencorporates.com/','Company records across jurisdictions'],['ICIJ Offshore Leaks','https://offshoreleaks.icij.org/','Offshore entities from the Panama and Pandora papers']]},
+ {name:'Legal', kind:'legal', instr:"Channel: Legal. Legal research for case work: case law, federal and Texas statutes and regulations, court dockets and filings. Quote the exact language and give the full citation (case name, court, date, reporter or docket number; statute or CFR section). Separate what a source says from your reading of it. Flag jurisdiction (federal, Texas, county), whether something is binding or persuasive, and whether a rule may have changed since. This is research, not legal advice; say when a lawyer should look at it. Paid sources like PACER cost per page: say before suggesting a paid pull.",
+  src:[['CourtListener','https://www.courtlistener.com/','Free case law, judges, oral arguments (Free Law Project)'],['RECAP Archive','https://www.courtlistener.com/recap/','Free copies of PACER dockets and filings'],['PACER','https://pacer.uscourts.gov/','Official federal court records, paid per page'],['Judyrecords','https://www.judyrecords.com/','Search across state and county court records'],['Caselaw Access Project','https://case.law/','Harvard\'s scanned US case law, free bulk data'],['Justia Law','https://law.justia.com/','Free case law, codes and regulations'],['Cornell LII','https://www.law.cornell.edu/','US Code, CFR and plain-English legal reference'],['GovInfo','https://www.govinfo.gov/','Official federal publications, US Code, court opinions'],['Federal Register','https://www.federalregister.gov/','Federal rules, proposed rules and notices'],['eCFR','https://www.ecfr.gov/','Current Code of Federal Regulations'],['Texas Statutes','https://statutes.capitol.texas.gov/','Texas codes, including the Penal Code'],['re:SearchTX','https://research.txcourts.gov/','Texas state court case records (free account)'],['Texas appellate case search','https://search.txcourts.gov/','Texas Supreme Court and courts of appeals dockets'],['Dallas County courts portal','https://courtsportal.dallascounty.org/DALLASPROD','Dallas County civil, criminal and family case search'],['Tarrant County','https://www.tarrantcountytx.gov/','Tarrant County courts and records'],['Collin County','https://www.collincountytx.gov/','Collin County courts and records']]}
 ];
-if(!S.chanSeeded){
-  CHANNELS.forEach((c, i) => S.projects.push({id:'ch' + Date.now() + i, name:c.name, instr:c.instr, files:[], src:c.src.map(([n,u,d]) => ({n,u,d}))}));
-  S.chanSeeded = 1; try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
-}
+const mkChan = (c, i) => ({id:'ch' + Date.now() + i, name:c.name, kind:c.kind, instr:c.instr, files:[], src:c.src.map(([n,u,d]) => ({n,u,d}))});
+if(!S.chanSeeded){ CHANNELS.forEach((c, i) => S.projects.push(mkChan(c, i))); S.chanSeeded = 2; }
+if(S.chanSeeded === 1){ const lg = CHANNELS.find(c => c.kind === 'legal'); if(!S.projects.some(p => /^legal$/i.test(p.name))) S.projects.push(mkChan(lg, 9)); S.projects.forEach(p => { if(/^osint$/i.test(p.name) && !p.kind) p.kind = 'osint'; }); S.chanSeeded = 2; }
+try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
 const okUrl = u => /^https?:\/\/[^\s/$.?#][^\s]*$/i.test(u);
 const app = $('app'), thread = $('thread'), scroll = $('scroll'), q = $('q'), send = $('send');
 const chat = () => S.chats.find(c => c.id === S.cur);
@@ -527,6 +541,9 @@ function fileChips(files, removable){
 }
 function exLabel(c, idx){ let n = 0; for(let i = 0; i <= idx; i++) n++; return 'E-' + String(n).padStart(3,'0'); }
 function msgHTML(c, msg, i){
+  if(msg.r === 't') return `<div class="tmsg" data-i="${i}"><div class="th">${ic(msg.tool === 'exif' ? 'img' : TOOLDEF[msg.tool] && TOOLDEF[msg.tool].kind === 'legal' ? 'case' : 'search')}<b>${esc((TOOLDEF[msg.tool] || {}).label || msg.tool)}</b><span>${esc(msg.target)}</span></div>
+    ${msg.err ? `<div class="warnbox" style="margin:6px 0 0">${esc(msg.err)}</div>` : `<div class="ts">${esc(msg.summary || '')}</div><div class="te">${msg.ev ? `Saved as evidence E${msg.ev.id} · SHA-256 ${esc(msg.ev.sha256.slice(0, 12))}… · ${new Date(msg.ev.created_at * 1000).toLocaleString()}` : ''}</div>
+    <div class="acts">${msg.ev ? `<button class="btn mini" data-act="evopen" data-ev="${msg.ev.id}">Details</button>` : ''}<button class="btn mini" data-act="caseopen">Case workspace</button></div>`}</div>`;
   const caseTags = c.caseMode ? `<div class="tags"><span class="tag ex">${exLabel(c, i)}</span>${tagsFor(plain(msg), msg.files).map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : '';
   if(msg.r === 'u'){
     if(msg.editing) return `<div class="u" data-i="${i}"><div class="edit"><textarea data-edit>${esc(msg.t)}</textarea><div class="row btns"><button class="btn" data-act="canceledit">Cancel</button><button class="btn dark" data-act="saveedit">Save and resend</button></div></div></div>`;
@@ -540,7 +557,7 @@ function msgHTML(c, msg, i){
 }
 function renderThread(keep){
   const c = chat();
-  app.classList.toggle('convo', !!c); if(typeof paintWeb === 'function') paintWeb();
+  app.classList.toggle('convo', !!c); if(typeof paintWeb === 'function') paintWeb(); if(typeof paintTools === 'function') paintTools();
   app.classList.toggle('casemode', !!(c && c.caseMode));
   app.classList.toggle('inproj', !c && !!S.curProj);
   $('projtag').innerHTML = S.curProj ? `# ${esc((proj(S.curProj)||{}).name || '')} · <u>instructions and sources</u>` : '';
@@ -669,6 +686,7 @@ function settingsSheet(){
     <button class="opt" data-s="memtoggle">${ic('brain')}<span>Use starter notes<small>Read-only</small></span><span class="sw ${S.mem ? 'on' : ''}"></span></button>
     <button class="opt" data-s="memview">${ic('lock')}See the starter notes</button>
     <button class="opt" data-s="voiceset">${ic('speak')}<span>Voice<small>${S.voice.on ? 'Reads replies out loud' : 'Off'} · ${(VOICES.find(v => v[0] === S.voice.name) || VOICES[0])[1]}</small></span></button>
+    <button class="opt" data-s="connopen">${ic('out')}<span>Connectors<small>Firecrawl, CourtListener, Shodan, Hunter.io, Have I Been Pwned</small></span></button>
     <button class="opt" data-s="faceset">${ic('face')}<span>${APPLE ? 'Face ID' : 'Passkeys'}<small>Sign in without your password</small></span></button>
     ${ME.role === 'admin' ? `<button class="opt" data-s="people">${ic('people')}<span>People and invites<small>Invite, approve, change roles, remove</small></span></button>
     <a class="opt" href="/admin/users" style="text-decoration:none;color:inherit">${ic('gear')}<span>Advanced admin<small>Models and settings (Open WebUI)</small></span></a>` : ''}
@@ -795,6 +813,7 @@ function sysPrompt(c){
   const p = c.proj && proj(c.proj), parts = [`You are Li, a private assistant running on ${ME.first ? ME.first + "'s" : 'the user\'s'} own GPU box.${webOn() ? ' Web search is on for this chat: when web pages are attached below, ground your answer in them and cite them.' : ' Web search is off for this chat, so nothing leaves this machine.'} Write like a sharp friend texting back: lead with the answer in the first sentence, keep it short (two to five sentences or a tight list) unless asked for depth, no headings, no sections explaining why you answered the way you did, no filler. Use a code block only for code. Never use em dashes.`];
   if(S.mem && MEM.length) parts.push('Starter notes about the user (read-only):\n' + MEM.map(m => '- ' + m[0]).join('\n'));
   if(p){ if(p.instr) parts.push(`Channel "${p.name}" instructions:\n${p.instr}`); if((p.src || []).length) parts.push(`Reference sources for this channel. Point the user to them by name and link when they help. You can't open them from here, so never claim you checked one:\n` + p.src.map(s => `- ${s.n} (${s.u})${s.d ? ': ' + s.d : ''}`).join('\n')); (p.files || []).filter(f => f.text).forEach(f => parts.push(`Project file ${f.n}:\n${f.text.slice(0, 20000)}`)); }
+  if(chanKind(c) && toolsFor(c).length) parts.push('You can run tools on the box. To run one, put it on its own line as TOOL: name target, for example TOOL: domain example.com. Available here: ' + toolsFor(c).filter(t => !TOOLDEF[t].file).map(t => `${t} (${TOOLDEF[t].label}: ${TOOLDEF[t].ask.toLowerCase()})`).join(', ') + '. Use at most two per reply, only on targets the user gave you or that came out of earlier results, then stop and wait: the results come back as a tool message. When results are in, say what they show and what they do not prove, and cite the evidence number (E12). Never invent tool output.');
   if(talkOn) parts.push('This reply will be spoken out loud on a voice call. Talk like a person on the phone: one to three short, natural sentences, no lists, no markdown, no code unless asked. Sound warm and direct.');
   if(c.caseMode) parts.push('This chat is a case file. Keep every date, amount and name exactly as written. Never guess or fill gaps.');
   return parts.join('\n\n');
@@ -837,6 +856,172 @@ async function gatherWeb(c, idx, label){
   const ok = pages.filter(x => x && x.text && x.text.trim().length > 40).map((x, k) => ({n:k + 1, t:x.title || hostOf(x.url), u:x.url, text:x.text}));
   return ok.length ? ok : null;
 }
+
+/* ---------- tools: OSINT and Legal channels. Results land in the chat and in the case workspace ---------- */
+const TOOLDEF = {
+  domain:{label:'Domain lookup', kind:'osint', ask:'Domain', ph:'example.com', what:'WHOIS, DNS records, certificate logs (crt.sh) and Wayback history'},
+  ip:{label:'IP lookup', kind:'osint', ask:'Public IP address', ph:'93.184.215.14', what:'Network owner (RDAP) and reverse DNS'},
+  wayback:{label:'Wayback history', kind:'osint', ask:'Web address or domain', ph:'example.com/about', what:'When the Internet Archive captured it, year by year'},
+  username:{label:'Username sweep', kind:'osint', ask:'Username', ph:'jdoe', what:'Checks 500 sites for a public profile with this name (Maigret). Takes up to 3 minutes'},
+  harvest:{label:'Domain harvest', kind:'osint', ask:'Domain', ph:'example.com', what:'Subdomains and emails from certificate logs, passive DNS, urlscan and the site\'s own pages'},
+  exif:{label:'Photo metadata', kind:'osint', file:true, what:'Camera, time taken, software and GPS from a photo (exiftool). The photo\'s SHA-256 is logged'},
+  shodan:{label:'Shodan host', kind:'osint', conn:'shodan', ask:'Public IP address', ph:'93.184.215.14', what:'Open ports, services and known vulnerabilities Shodan has seen'},
+  hunter:{label:'Hunter.io emails', kind:'osint', conn:'hunter', ask:'Domain', ph:'example.com', what:'Public emails and the email pattern for a company domain'},
+  pwned:{label:'Breach check', kind:'osint', conn:'hibp', ask:'Email address', ph:'name@example.com', what:'Known data breaches this email appears in (Have I Been Pwned)'},
+  cases:{label:'Case law search', kind:'legal', ask:'Search', ph:'"check kiting" Texas', what:'Court opinions from CourtListener'},
+  dockets:{label:'Court dockets (RECAP)', kind:'legal', ask:'Search', ph:'party name or docket number', what:'Federal PACER dockets that are in the free RECAP archive'},
+  fedreg:{label:'Federal Register', kind:'legal', ask:'Search', ph:'money transmitter rule', what:'Federal rules, proposed rules and notices'},
+  ecfr:{label:'eCFR', kind:'legal', ask:'Search', ph:'suspicious activity report', what:'Current Code of Federal Regulations text'},
+  scrape:{label:'Firecrawl scrape', kind:'any', conn:'firecrawl', ask:'Web address', ph:'https://example.com/page', what:'Clean text of any page, including pages that need a real browser'},
+  fsearch:{label:'Firecrawl search', kind:'any', conn:'firecrawl', ask:'Search', ph:'query', what:'Web search that returns full page content'},
+  crawl:{label:'Firecrawl crawl', kind:'any', conn:'firecrawl', ask:'Web address', ph:'https://example.com', what:'Reads up to 10 pages of a site'}
+};
+const SLASH = {domain:'domain', whois:'domain', dns:'domain', ip:'ip', wayback:'wayback', user:'username', username:'username', harvest:'harvest', exif:'exif', photo:'exif',
+  shodan:'shodan', hunter:'hunter', pwned:'pwned', breach:'pwned', scrape:'scrape', search:'fsearch', crawl:'crawl', cases:'cases', caselaw:'cases', dockets:'dockets', fedreg:'fedreg', ecfr:'ecfr', cfr:'ecfr'};
+let CONN = {}; /* connector id -> connected, from the box */
+async function loadConn(){ try{ (await j('/li-auth/connectors')).forEach(x => CONN[x.id] = x); }catch(e){} }
+const chanOf = c => { const id = c ? c.proj : S.curProj; return id ? proj(id) : null; };
+const chanKind = c => { const p = chanOf(c); return p ? (p.kind || (/^osint$/i.test(p.name) ? 'osint' : /^legal$/i.test(p.name) ? 'legal' : null)) : null; };
+const caseName = c => { const p = chanOf(c); return p ? p.name : 'General'; };
+const connOn = (c, id) => { const p = chanOf(c); return !!(CONN[id] && CONN[id].connected) && !(p && p.connOff && p.connOff[id]); };
+const toolsFor = c => { const k = chanKind(c); if(!k) return []; return Object.keys(TOOLDEF).filter(t => { const d = TOOLDEF[t]; return (d.kind === k || d.kind === 'any') && (!d.conn || connOn(c, d.conn)); }); };
+function toolContext(x){
+  if(x.err) return `Tool ${x.tool} on ${x.target} failed: ${x.err}`;
+  return `Tool result: ${(TOOLDEF[x.tool] || {}).label || x.tool} for "${x.target}" from ${x.ev ? x.ev.source : 'the box'} (saved as evidence E${x.ev ? x.ev.id : '?'}, SHA-256 ${x.ev ? x.ev.sha256 : ''}). Summary: ${x.summary}\n` + JSON.stringify(x.data || {}).slice(0, 7000);
+}
+function ensureChat(text){
+  let c = chat();
+  if(!c){ c = {id:'c' + Date.now(), title:text.slice(0, 42), pinned:false, proj:S.curProj, web:S.nextWeb !== false, model:S.nextModel, caseMode:false, t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; }
+  return c;
+}
+async function runTool(c, tool, target, thenAsk){
+  c = c || ensureChat('/' + tool + ' ' + target);
+  if(!c.msgs.length || chat() !== c){ S.cur = c.id; }
+  const m = {r:'t', tool, target, ts:Date.now(), v:[{md:''}], vi:0, summary:'Running…'};
+  c.msgs.push(m); c.t = Date.now(); renderThread(); toEnd(); save();
+  try{
+    const x = await j('/li-auth/tool/' + tool, {method:'POST', body:JSON.stringify({target, case:caseName(c)})});
+    Object.assign(m, {summary:x.evidence.summary, ev:x.evidence, data:x.data}); m.v = [{md:`${(TOOLDEF[tool]||{}).label}: ${target}. ${x.evidence.summary}`}];
+  }catch(e){ m.err = e.message; m.summary = ''; m.v = [{md:`${tool} ${target} failed: ${e.message}`}]; }
+  renderThread(true); toEnd(); save();
+  if(thenAsk && !m.err && !busy) await respond(c, c.msgs.length, false);
+  return m;
+}
+async function toolFollowUp(c, idx, msg){
+  if(!chanKind(c) || (msg.toolDepth || 0) >= 2) return;
+  const allowed = toolsFor(c).filter(t => !TOOLDEF[t].file);
+  const calls = [...plain(msg).matchAll(/^\s*TOOL:\s*(\w+)\s+(.+?)\s*$/gim)].map(m => [SLASH[m[1].toLowerCase()] || m[1].toLowerCase(), m[2].replace(/[`*]/g, '').trim()]).filter(([t]) => allowed.includes(t)).slice(0, 2);
+  if(!calls.length) return;
+  for(const [t, target] of calls) await runTool(c, t, target, false);
+  if(busy) return;
+  const before = c.msgs.length; await respond(c, c.msgs.length, false);
+  const nm = c.msgs[before]; if(nm) nm.toolDepth = (msg.toolDepth || 0) + 1;
+}
+let exifTarget = null;
+$('fexif').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+  const c = ensureChat('Photo metadata: ' + f.name); renderThread();
+  const m = {r:'t', tool:'exif', target:f.name, ts:Date.now(), v:[{md:''}], vi:0, summary:'Reading the photo…'}; c.msgs.push(m); renderThread(); toEnd();
+  try{
+    const r = await fetch('/li-auth/tool-exif', {method:'POST', credentials:'same-origin', headers:{Authorization:'Bearer ' + token(), 'Content-Type':'application/octet-stream', 'x-file-name':f.name.replace(/[^\w .-]/g, '_').slice(0, 100), 'x-case':caseName(c)}, body:f});
+    const x = await r.json().catch(() => ({})); if(!r.ok) throw new Error(x.detail || 'Could not read that photo.');
+    Object.assign(m, {summary:x.evidence.summary, ev:x.evidence, data:x.data}); m.v = [{md:`Photo metadata: ${f.name}. ${x.evidence.summary}`}];
+  }catch(err){ m.err = err.message; m.summary = ''; m.v = [{md:'Photo metadata failed: ' + err.message}]; }
+  renderThread(true); toEnd(); save();
+  if(!m.err && !busy) respond(c, c.msgs.length, false);
+};
+function toolsSheet(){
+  const c = chat(), k = chanKind(c); if(!k) return;
+  const all = Object.keys(TOOLDEF).filter(t => TOOLDEF[t].kind === k || TOOLDEF[t].kind === 'any'), ok = toolsFor(c);
+  sheet(`<div class="sh">${ic('search')} ${k === 'legal' ? 'Legal' : 'OSINT'} tools</div>
+    <div class="note">Results show up in the chat, Li reads them, and each one is saved to the ${esc(caseName(c))} case workspace with a timestamp and SHA-256. You can also type /${k === 'legal' ? 'cases' : 'domain'} and a target, or just ask Li.</div>
+    ${all.map(t => { const d = TOOLDEF[t], on = ok.includes(t); return `<button class="opt" data-s="${on ? 'toolpick' : 'connset'}" data-t="${t}">${ic(d.file ? 'img' : d.conn ? 'out' : 'search')}<span>${esc(d.label)}<small>${esc(d.what)}${on ? '' : ' · needs your ' + esc(CONNECTORS_UI[d.conn].name) + ' key'}</small></span>${on ? '' : '<span class="badge">Connect</span>'}</button>`; }).join('')}
+    <div class="btns" style="margin-top:10px"><button class="btn" data-s="caseopen">Case workspace</button></div>`);
+}
+function toolForm(t){
+  const d = TOOLDEF[t]; if(d.file){ exifTarget = (chat() || {}).id; closeS(); $('fexif').click(); return; }
+  sheet(`<div class="sh">${esc(d.label)}</div><div class="note">${esc(d.what)}</div>
+    <input class="field" id="tgt" placeholder="${esc(d.ph || '')}" aria-label="${esc(d.ask)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="btns"><button class="btn" data-s="toolsback">Back</button><button class="btn dark" data-s="toolrun" data-t="${t}">Run</button></div>`);
+  setTimeout(() => $('tgt') && $('tgt').focus(), 50);
+}
+/* ---------- case workspace ---------- */
+let caseTab = 'evidence', caseQ = '';
+async function caseSheet(name, tab){
+  caseTab = tab || caseTab; const base = '/li-auth/case/' + encodeURIComponent(name);
+  const head = `<div class="sh">${ic('case')} ${esc(name)} case</div>
+    <div class="seg"><button class="${caseTab === 'evidence' ? 'on' : ''}" data-s="ctab" data-t="evidence" data-c="${esc(name)}">Evidence</button><button class="${caseTab === 'entities' ? 'on' : ''}" data-s="ctab" data-t="entities" data-c="${esc(name)}">Entities</button><button class="${caseTab === 'timeline' ? 'on' : ''}" data-s="ctab" data-t="timeline" data-c="${esc(name)}">Timeline</button></div>
+    ${caseTab === 'timeline' ? '' : `<input class="field" id="cq" type="search" placeholder="Search ${caseTab} and tags" value="${esc(caseQ)}" data-c="${esc(name)}" style="margin-top:0">`}`;
+  sheet(head + '<div class="note">Loading…</div>');
+  try{
+    let body = '';
+    if(caseTab === 'evidence'){
+      const xs = await j(base + '/evidence?q=' + encodeURIComponent(caseQ));
+      body = xs.map(x => `<div class="prow"><div class="av" style="font-size:11px">E${x.id}</div><div class="who"><b>${esc((TOOLDEF[x.kind] || {}).label || x.kind)}: ${esc(x.target)}</b><small>${esc(x.summary)}</small><small>${new Date(x.created_at * 1000).toLocaleString()} · ${esc(x.source)} · SHA-256 ${esc(x.sha256.slice(0, 12))}…${x.tags ? ' · #' + esc(x.tags.replace(/,/g, ' #')) : ''}</small></div><div class="pa"><button class="btn mini" data-s="evone" data-id="${x.id}">Open</button></div></div>`).join('') || '<div class="empty">Nothing saved yet. Run a tool and it lands here.</div>';
+    } else if(caseTab === 'entities'){
+      const xs = await j(base + '/entities?q=' + encodeURIComponent(caseQ)); let last = '';
+      body = xs.map(x => { const h = x.etype !== last ? `<div class="lab" style="padding:12px 4px 2px">${esc(x.etype)}s</div>` : ''; last = x.etype;
+        return h + `<div class="prow"><div class="who"><b style="font-family:var(--mono);font-size:13px">${esc(x.value)}</b><small>Seen in ${esc(x.evidence.split(',').map(e => 'E' + e).join(', '))} · first ${new Date(x.first_seen * 1000).toLocaleDateString()}${x.tags ? ' · #' + esc(x.tags.replace(/,/g, ' #')) : ''}${x.note ? ' · ' + esc(x.note) : ''}</small></div><div class="pa"><button class="btn mini" data-s="entag" data-id="${x.id}" data-tags="${esc(x.tags)}" data-note="${esc(x.note)}" data-c="${esc(name)}">Tag</button></div></div>`; }).join('') || '<div class="empty">No entities yet.</div>';
+    } else {
+      const xs = await j(base + '/timeline');
+      body = `<div style="display:flex;gap:6px;margin-bottom:8px"><input class="field" id="cnote" placeholder="Add a note to the timeline" style="margin:0"><button class="btn dark" data-s="cnote" data-c="${esc(name)}">Add</button></div>` +
+        (xs.map(x => `<div class="prow"><div class="av" style="font-size:11px">${esc(x.ref)}</div><div class="who"><b>${esc(x.what)}</b><small>${new Date(x.at * 1000).toLocaleString()}</small><small>${esc(x.detail || '')}</small></div></div>`).join('') || '<div class="empty">Nothing on the timeline yet.</div>');
+    }
+    sheet(head + body);
+  }catch(e){ sheet(head + `<div class="warnbox">${esc(e.message)}</div>`); }
+}
+async function evidenceSheet(id){
+  try{
+    const x = await j('/li-auth/evidence/' + id);
+    sheet(`<div class="sh">Evidence E${x.id}</div>
+      <div class="memitem">${ic('check')}<div>${x.verified ? 'Hash checks out' : 'Hash does NOT match'}<small>SHA-256 ${esc(x.sha256)}${x.file_sha256 ? '<br>File SHA-256 ' + esc(x.file_sha256) : ''}</small></div></div>
+      <div class="memitem">${ic('search')}<div>${esc((TOOLDEF[x.kind] || {}).label || x.kind)}: ${esc(x.target)}<small>${new Date(x.created_at * 1000).toLocaleString()} · ${esc(x.source)} · case ${esc(x.case_name)}</small></div></div>
+      <div class="note" style="margin-top:10px">Tags (comma separated)</div><input class="field" id="evtags" value="${esc(x.tags)}">
+      <pre class="evraw">${esc(JSON.stringify(x.data, null, 2).slice(0, 40000))}</pre>
+      <div class="btns"><button class="btn" data-s="evcopy" data-id="${x.id}">Copy JSON</button><button class="btn dark" data-s="evtag" data-id="${x.id}" data-c="${esc(x.case_name)}">Save tags</button></div>`);
+    window.__ev = x;
+  }catch(e){ toast(e.message); }
+}
+/* ---------- connectors (Settings) ---------- */
+const CONNECTORS_UI = {firecrawl:{name:'Firecrawl'}, courtlistener:{name:'CourtListener'}, shodan:{name:'Shodan'}, hunter:{name:'Hunter.io'}, hibp:{name:'Have I Been Pwned'}};
+const BUILTIN = [['Private web search (SearXNG)','On the box, no key'],['crt.sh certificate logs','Free, no key'],['Internet Archive (Wayback)','Free, no key'],['RDAP and WHOIS registries','Free, no key'],['DNS','Free, no key'],['AlienVault OTX, HackerTarget, urlscan.io','Free public endpoints, no key, low daily limits'],['Maigret username sweep','Open source, runs on the box'],['exiftool photo metadata','Open source, runs on the box'],['CourtListener','Works without a key, a free token raises limits'],['Federal Register and eCFR','Free, no key']];
+async function connSheet(focus){
+  let xs = []; try{ xs = await j('/li-auth/connectors'); xs.forEach(x => CONN[x.id] = x); }catch(e){ toast(e.message); return; }
+  const c = chat(), p = chanOf(c);
+  sheet(`<div class="sh">${ic('out')} Connectors</div><div class="note">Your own API keys. They're stored encrypted on the box, only the last 4 characters are ever shown, and they're used only for your account.</div>
+    ${xs.map(x => `<div class="conn" id="cn-${x.id}"><div class="ch"><b>${esc(x.name)}</b><span class="badge ${x.connected ? 'used' : ''}">${x.connected ? 'Connected · …' + esc(x.last4) : 'Not connected'}</span></div>
+      <div class="note" style="margin:4px 0 8px">${esc(x.what)}</div>
+      ${x.connected ? `<div class="btns" style="justify-content:flex-start">${p ? `<button class="opt" style="padding:6px 0;width:auto" data-s="connch" data-k="${x.id}"><span>On in #${esc(p.name)}</span><span class="sw ${p.connOff && p.connOff[x.id] ? '' : 'on'}" style="margin-left:10px"></span></button>` : ''}<button class="btn mini" data-s="conndel" data-k="${x.id}" style="margin-left:auto">Remove key</button></div>`
+        : `<div style="display:flex;gap:6px"><input class="field" id="ck-${x.id}" type="password" autocomplete="off" placeholder="Paste your ${esc(x.name)} API key" style="margin:0"><button class="btn dark" data-s="connsave" data-k="${x.id}">Connect</button></div><a class="note" href="${esc(x.key_url)}" target="_blank" rel="noopener noreferrer" style="display:block;margin-top:6px;color:var(--rust)">Where to get a key</a>`}</div>`).join('')}
+    <div class="lab" style="padding:14px 4px 4px">Built in, nothing to connect</div>
+    ${BUILTIN.map(([n, d]) => `<div class="memitem">${ic('check')}<div>${esc(n)}<small>${esc(d)}</small></div></div>`).join('')}`);
+  if(focus) setTimeout(() => { const el = $('cn-' + focus); el && el.scrollIntoView({block:'center'}); const i = $('ck-' + focus); i && i.focus(); }, 60);
+}
+$('sheetIn').addEventListener('click', async e => {
+  const b = e.target.closest('[data-s]'); if(!b) return; const s = b.dataset.s;
+  if(s === 'toolpick') toolForm(b.dataset.t);
+  else if(s === 'toolsback') toolsSheet();
+  else if(s === 'toolrun'){ const v = $('tgt').value.trim(); if(!v) return; closeS(); runTool(chat() || null, b.dataset.t, v, true); }
+  else if(s === 'connset') connSheet(TOOLDEF[b.dataset.t].conn);
+  else if(s === 'connopen') connSheet();
+  else if(s === 'caseopen') caseSheet(caseName(chat()));
+  else if(s === 'ctab'){ caseQ = ''; caseSheet(b.dataset.c, b.dataset.t); }
+  else if(s === 'evone') evidenceSheet(+b.dataset.id);
+  else if(s === 'evcopy') copy(JSON.stringify(window.__ev, null, 2));
+  else if(s === 'evtag'){ try{ await j('/li-auth/tag/evidence/' + b.dataset.id, {method:'POST', body:JSON.stringify({tags:$('evtags').value})}); toast('Tags saved'); caseSheet(b.dataset.c, 'evidence'); }catch(err){ toast(err.message); } }
+  else if(s === 'entag'){ sheet(`<div class="sh">Tag entity</div><input class="field" id="entags" placeholder="tags, comma separated" value="${esc(b.dataset.tags)}"><input class="field" id="ennote" placeholder="note" value="${esc(b.dataset.note)}"><div class="btns"><button class="btn" data-s="ctab" data-t="entities" data-c="${esc(b.dataset.c)}">Back</button><button class="btn dark" data-s="ensave" data-id="${b.dataset.id}" data-c="${esc(b.dataset.c)}">Save</button></div>`); }
+  else if(s === 'ensave'){ try{ await j('/li-auth/tag/entity/' + b.dataset.id, {method:'POST', body:JSON.stringify({tags:$('entags').value, note:$('ennote').value})}); caseSheet(b.dataset.c, 'entities'); }catch(err){ toast(err.message); } }
+  else if(s === 'cnote'){ const v = $('cnote').value.trim(); if(!v) return; try{ await j('/li-auth/case/' + encodeURIComponent(b.dataset.c) + '/note', {method:'POST', body:JSON.stringify({text:v})}); caseSheet(b.dataset.c, 'timeline'); }catch(err){ toast(err.message); } }
+  else if(s === 'connsave'){ const k = b.dataset.k, v = $('ck-' + k).value.trim(); if(!v) return; b.disabled = true; b.textContent = 'Checking…'; try{ await j('/li-auth/connectors/' + k, {method:'POST', body:JSON.stringify({key:v})}); toast(CONNECTORS_UI[k].name + ' connected'); }catch(err){ toast(err.message); } connSheet(); }
+  else if(s === 'conndel'){ try{ await j('/li-auth/connectors/' + b.dataset.k, {method:'DELETE'}); toast('Key removed'); }catch(err){ toast(err.message); } connSheet(); }
+  else if(s === 'connch'){ const p = chanOf(chat()); if(!p) return; p.connOff = p.connOff || {}; p.connOff[b.dataset.k] = !p.connOff[b.dataset.k]; save(); b.querySelector('.sw').classList.toggle('on', !p.connOff[b.dataset.k]); paintTools(); }
+});
+$('sheetIn').addEventListener('keydown', e => {
+  if(e.target.id === 'cq' && e.key === 'Enter'){ caseQ = e.target.value.trim(); caseSheet(e.target.dataset.c); }
+  if(e.target.id === 'tgt' && e.key === 'Enter'){ e.preventDefault(); const r = $('sheetIn').querySelector('[data-s="toolrun"]'); r && r.click(); }
+});
+function paintTools(){ const k = chanKind(chat()); $('toolc').style.display = k ? '' : 'none'; $('casec').style.display = k ? '' : 'none'; $('toolc').innerHTML = ic('search') + 'Tools'; $('casec').innerHTML = ic('case') + 'Case'; }
+$('toolc').onclick = toolsSheet; $('casec').onclick = () => caseSheet(caseName(chat()));
 let busy = false, ctl = null, leftPage = false;
 document.addEventListener('visibilitychange', () => {
   if(document.hidden){ if(busy) leftPage = true; return; }
@@ -861,7 +1046,7 @@ async function respond(c, idx, alt){
   if(web) sp += '\n\nWeb pages fetched just now for this question. Use them, cite them inline as [1], [2] by number, and say when they don\'t answer it. Never cite a number that isn\'t listed here:\n' + web.map(w => `[${w.n}] ${w.t} (${w.u})\n${w.text}`).join('\n\n');
   else if(webOn()) sp += '\n\nWeb search is on for this chat but found nothing usable for this message. Answer from what you know and say so if it matters.';
   const msgs = [{role:'system', content:sp}];
-  c.msgs.slice(0, idx).forEach(x => msgs.push(x.r === 'u' ? {role:'user', content:userContent(x)} : {role:'assistant', content:plain(x)}));
+  c.msgs.slice(0, idx).forEach(x => msgs.push(x.r === 'u' ? {role:'user', content:userContent(x)} : x.r === 't' ? {role:'user', content:toolContext(x)} : {role:'assistant', content:plain(x)}));
   let md = '', err = '', tps = null, toks = 0, first = 0, last = 0, inThink = false, a = null, body = null, tpsEl = null;
   const stamps = [];
   const tick = () => { const t = performance.now(); toks++; if(!first) first = t; last = t; stamps.push(t); while(stamps.length && t - stamps[0] > 1500) stamps.shift(); window.liTps = stamps.length > 2 ? (stamps.length - 1) / ((t - stamps[0]) / 1000) : 0; if(tpsEl) tpsEl.textContent = window.liTps ? window.liTps.toFixed(1) + ' tok/s' : ''; };
@@ -916,6 +1101,7 @@ async function respond(c, idx, alt){
   c.msgs[idx] = msg; c.t = Date.now();
   busy = false; leftPage = false; app.classList.remove('busy'); send.setAttribute('aria-label', 'Send'); updateSend();
   renderThread(true); toEnd(); save();
+  if(!err && !talkOn) setTimeout(() => toolFollowUp(c, idx, msg), 0);
   return err ? '' : plain(msg);
 }
 $('form').onsubmit = e => {
@@ -925,6 +1111,15 @@ $('form').onsubmit = e => {
   let c = chat();
   if(!c){ c = {id:'c' + Date.now(), title:(text || pending[0].n).slice(0, 42), pinned:false, proj:S.curProj, web:S.nextWeb !== false, model:S.nextModel, caseMode:S.curProj === 'p2', t:Date.now(), msgs:[]}; S.chats.push(c); S.cur = c.id; S.curProj = null; S.nextModel = 'local'; }
   if(pending.some(f => f.busy || (!f.skip && !f.text && !f.data))){ toast('Still reading your file, one sec'); return; }
+  const sl = text.match(/^\/(\w+)\s*(.*)$/);
+  if(sl && SLASH[sl[1].toLowerCase()] && chanKind(c)){
+    const tl = SLASH[sl[1].toLowerCase()];
+    if(!toolsFor(c).includes(tl)){ toast((TOOLDEF[tl] || {}).label + ' is not available in this channel'); return; }
+    q.value = ''; q.style.height = 'auto';
+    if(tl === 'exif'){ exifTarget = c.id; $('fexif').click(); return; }
+    if(!sl[2].trim()){ toolForm(tl); return; }
+    runTool(c, tl, sl[2].trim(), true); return;
+  }
   c.msgs.push({r:'u', t:text || 'Here are the files.', files:pending.map(({n,s,k,url,text,data}) => ({n,s,k,url,text,data})), ts:Date.now()});
   pending = []; renderAtt(); q.value = ''; q.style.height = 'auto';
   renderThread(); respond(c, c.msgs.length, false);
@@ -934,6 +1129,8 @@ $('form').onsubmit = e => {
 thread.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if(!b || busy) return;
   const c = chat(), node = b.closest('[data-i]'), i = +node.dataset.i, msg = c.msgs[i], act = b.dataset.act;
+  if(act === 'evopen'){ evidenceSheet(+b.dataset.ev); return; }
+  if(act === 'caseopen'){ caseSheet(caseName(c)); return; }
   if(act === 'copy') copy(plain(msg));
   else if(act === 'speak'){ voice.stop(); voice.unlock(); voice.feed(plain(msg)); voice.end(); }
   else if(act === 'good' || act === 'bad'){ const v = act === 'good' ? 1 : -1; msg.rate = msg.rate === v ? 0 : v; renderThread(true); save(); }
@@ -1284,6 +1481,7 @@ async function boot(fresh){
     const ids = (m.data || []).map(x => x.id);
     MODEL = ids.find(x => /qwen3\.8|abliterated/i.test(x)) || ids[0] || '';
     if(!MODEL) toast('No model found on the box');
+    loadConn().then(() => renderThread(true));
     renderThread();
     if(fresh && S.offerFace){ S.offerFace = false; save(); faceOffer(); }
   }catch(e){ toast('Couldn\'t reach the box'); }

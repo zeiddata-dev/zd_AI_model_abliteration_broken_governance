@@ -3,7 +3,7 @@ Runs inside the open-webui container (docker exec) so it can use Open WebUI's ow
 account code. Listens on 127.0.0.1 only; Caddy sends /li-auth/* here.
 Nothing here stores a password: Open WebUI keeps those. Invite codes are stored hashed."""
 import logging; logging.getLogger('httpx').setLevel(logging.WARNING)
-import asyncio, base64, hashlib, json, os, secrets, sqlite3, sys, threading, time
+import asyncio, base64, hashlib, ipaddress, json, os, re, secrets, sqlite3, sys, threading, time
 from datetime import timedelta
 
 sys.path.insert(1, os.environ.get('LI_BACKEND', '/app/backend'))  # Open WebUI's own package
@@ -366,6 +366,327 @@ async def web_read(req: Request):
     else:
         raise HTTPException(415, 'Li reads web pages and text, not that kind of file.')
     return {'url': str(r.url), 'title': title[:200], 'text': text[:limit_chars], 'chars': len(text)}
+
+
+# ---------- case workspace: evidence log (SHA-256), entities, timeline ----------
+OSINT = os.environ.get('LI_OSINT', 'http://127.0.0.1:3014')
+with _lk:
+    _db.executescript("""
+    create table if not exists evidence(id integer primary key autoincrement, user_id text, case_name text, kind text, target text,
+      summary text, data text, sha256 text, file_sha256 text, source text, tags text default '', created_at integer);
+    create index if not exists ev_case on evidence(user_id, case_name, created_at);
+    create table if not exists entities(id integer primary key autoincrement, user_id text, case_name text, etype text, value text,
+      note text default '', tags text default '', first_seen integer, last_seen integer, evidence text default '',
+      unique(user_id, case_name, etype, value));
+    create table if not exists notes(id integer primary key autoincrement, user_id text, case_name text, text text, at integer, created_at integer);
+    create table if not exists connectors(user_id text, name text, enc text, last4 text, updated_at integer, primary key(user_id, name));
+    """); _db.commit()
+
+def canon(o) -> str:
+    return json.dumps(o, sort_keys=True, separators=(',', ':'), ensure_ascii=False, default=str)
+
+def entity(uid, case, et, val, ev_id, t):
+    val = str(val).strip()[:300]
+    if not val: return
+    with _lk:
+        _db.execute("insert into entities(user_id,case_name,etype,value,first_seen,last_seen,evidence) values(?,?,?,?,?,?,?) "
+                    "on conflict(user_id,case_name,etype,value) do update set last_seen=excluded.last_seen, "
+                    "evidence=case when instr(','||entities.evidence||',', ','||excluded.evidence||',')>0 then entities.evidence else entities.evidence||','||excluded.evidence end",
+                    (uid, case, et, val, t, t, str(ev_id))); _db.commit()
+
+def extract(kind, target, data):
+    out = []
+    if kind in ('domain', 'harvest', 'hunter'): out.append(('domain', target))
+    if kind == 'domain':
+        for ip in (data.get('dns') or {}).get('A', []) + (data.get('dns') or {}).get('AAAA', []): out.append(('ip', ip))
+        for e in (data.get('whois') or {}).get('emails', []) if isinstance((data.get('whois') or {}).get('emails'), list) else []: out.append(('email', e))
+        org = (data.get('whois') or {}).get('org')
+        if org: out.append(('organization', org))
+        for n in (data.get('crtsh') or {}).get('names', [])[:60]: out.append(('domain', n))
+    if kind == 'harvest':
+        out += [('domain', s) for s in data.get('subdomains', [])[:150]] + [('email', e) for e in data.get('emails', [])]
+    if kind in ('ip', 'shodan'): out.append(('ip', target))
+    if kind == 'ip':
+        if data.get('reverse_dns'): out.append(('domain', data['reverse_dns']))
+        if (data.get('rdap') or {}).get('name'): out.append(('organization', data['rdap']['name']))
+    if kind == 'username':
+        out.append(('username', target)); out += [('account', f"{x['site']}: {x['url']}") for x in data.get('found', [])]
+    if kind == 'exif' and data.get('gps'): out.append(('location', f"{data['gps']['lat']:.6f},{data['gps']['lon']:.6f}"))
+    if kind == 'hunter': out += [('email', e.get('value')) for e in (data.get('emails') or []) if e.get('value')]
+    if kind == 'pwned': out.append(('email', target))
+    return out
+
+def summarize(kind, target, d):
+    if kind == 'domain':
+        w, dn, c, wb = d.get('whois') or {}, d.get('dns') or {}, d.get('crtsh') or {}, d.get('wayback') or {}
+        return '; '.join(x for x in [f"registrar {w.get('registrar')}" if w.get('registrar') else '', f"created {str(w.get('creation_date'))[:10]}" if w.get('creation_date') else '',
+            f"A {', '.join(dn.get('A', [])[:4])}" if dn.get('A') else '', f"{len(c.get('names', []))} names in {c.get('certificates', 0)} certificates" if 'names' in c else '',
+            f"archived since {(wb.get('first') or {}).get('when', '')[:4]}" if wb.get('first') else ''] if x) or 'no records found'
+    if kind == 'ip': return f"{(d.get('rdap') or {}).get('name') or 'unknown network'}, {(d.get('rdap') or {}).get('country') or '?'}; reverse DNS {d.get('reverse_dns') or 'none'}"
+    if kind == 'wayback': return f"{d.get('yearly_captures', 0)} yearly captures, first {((d.get('first') or {}).get('when') or '')[:8]}, last {((d.get('last') or {}).get('when') or '')[:8]}"
+    if kind == 'username': return f"{len(d.get('found', []))} public profiles answered out of {d.get('checked_sites')} sites checked"
+    if kind == 'harvest': return f"{len(d.get('subdomains', []))} subdomains, {len(d.get('emails', []))} emails"
+    if kind == 'exif': return ', '.join(f'{k}: {v}' for k, v in (d.get('summary') or {}).items()) + (f"; GPS {d['gps']['lat']:.5f},{d['gps']['lon']:.5f}" if d.get('gps') else '; no GPS')
+    if kind in ('cases', 'dockets', 'fedreg', 'ecfr', 'fsearch'): return f"{len(d.get('results', []))} results"
+    if kind == 'shodan': return f"{len(d.get('ports', []))} open ports seen by Shodan: {', '.join(str(p) for p in d.get('ports', [])[:12])}"
+    if kind == 'hunter': return f"{len(d.get('emails', []))} emails, pattern {d.get('pattern') or 'unknown'}"
+    if kind == 'pwned': return f"{len(d.get('breaches', []))} breaches" if d.get('breaches') else 'not found in any breach'
+    if kind in ('scrape', 'crawl'): return f"{d.get('pages', 1)} page(s) read"
+    return ''
+
+def save_evidence(u, case, kind, target, data, source, file_sha=None):
+    t = now(); body = canon(data); sha = hashlib.sha256(body.encode()).hexdigest(); summ = summarize(kind, target, data)
+    with _lk:
+        cur = _db.execute('insert into evidence(user_id,case_name,kind,target,summary,data,sha256,file_sha256,source,created_at) values(?,?,?,?,?,?,?,?,?,?)',
+                          (u['id'], case, kind, target, summ, body, sha, file_sha, source, t)); _db.commit(); eid = cur.lastrowid
+    for et, val in extract(kind, target, data): entity(u['id'], case, et, val, eid, t)
+    return {'id': eid, 'sha256': sha, 'file_sha256': file_sha, 'summary': summ, 'created_at': t, 'source': source}
+
+def case_of(b):
+    return (str(b.get('case') or 'General').strip() or 'General')[:80]
+
+# ---------- connectors: user's own API keys, encrypted at rest ----------
+from cryptography.fernet import Fernet
+_kf = os.path.join(os.path.dirname(DB), 'connectors.key')
+if not os.path.exists(_kf):
+    with open(os.open(_kf, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as f: f.write(Fernet.generate_key())
+FERNET = Fernet(open(_kf, 'rb').read())
+CONNECTORS = {
+  'firecrawl': {'name': 'Firecrawl', 'what': 'Scrape any page to clean text, web search with full page content, and crawl a whole site.', 'key_url': 'https://www.firecrawl.dev/app/api-keys'},
+  'courtlistener': {'name': 'CourtListener', 'what': 'Case law, PACER dockets in RECAP, judges and oral arguments. Works without a key; a free token raises the limits.', 'key_url': 'https://www.courtlistener.com/profile/api/'},
+  'shodan': {'name': 'Shodan', 'what': 'What a public IP exposes: open ports, services, banners and known vulnerabilities, from Shodan\'s own scans.', 'key_url': 'https://account.shodan.io/'},
+  'hunter': {'name': 'Hunter.io', 'what': 'Public email addresses and the email pattern for a company domain, with sources.', 'key_url': 'https://hunter.io/api-keys'},
+  'hibp': {'name': 'Have I Been Pwned', 'what': 'Which known data breaches an email address appears in.', 'key_url': 'https://haveibeenpwned.com/API/Key'},
+}
+def key_for(uid, name):
+    r = q('select enc from connectors where user_id=? and name=?', (uid, name), one=True)
+    return FERNET.decrypt(r['enc'].encode()).decode() if r else None
+
+async def check_key(name, k):
+    try:
+        if name == 'firecrawl':
+            r = await web_http.get('https://api.firecrawl.dev/v2/team/credit-usage', headers={'Authorization': 'Bearer ' + k})
+        elif name == 'courtlistener':
+            r = await web_http.get('https://www.courtlistener.com/api/rest/v4/search/', params={'q': 'test'}, headers={'Authorization': 'Token ' + k})
+        elif name == 'shodan':
+            r = await web_http.get('https://api.shodan.io/api-info', params={'key': k})
+        elif name == 'hunter':
+            r = await web_http.get('https://api.hunter.io/v2/account', params={'api_key': k})
+        elif name == 'hibp':
+            r = await web_http.get('https://haveibeenpwned.com/api/v3/subscription/status', headers={'hibp-api-key': k, 'user-agent': 'Li-case-tools'})
+        else: return False
+    except Exception:
+        raise HTTPException(502, 'Could not reach the service to check the key. Try again.')
+    if r.status_code in (401, 403): raise HTTPException(400, 'The service turned that key down.')
+    return r.status_code < 400 or r.status_code == 404
+
+@app.get('/li-auth/connectors')
+async def list_connectors(req: Request):
+    u = await who(req)
+    mine = {r['name']: r for r in q('select name,last4,updated_at from connectors where user_id=?', (u['id'],))}
+    return [{'id': k, **v, 'connected': k in mine, 'last4': mine[k]['last4'] if k in mine else None, 'updated_at': mine[k]['updated_at'] if k in mine else None} for k, v in CONNECTORS.items()]
+
+@app.post('/li-auth/connectors/{name}')
+async def set_connector(name: str, req: Request):
+    u = await who(req); limit(req, 'ck', 20)
+    if name not in CONNECTORS: raise HTTPException(404, 'Unknown connector.')
+    k = str((await req.json()).get('key') or '').strip()
+    if not (8 <= len(k) <= 300) or any(c.isspace() for c in k): raise HTTPException(400, 'Paste the whole key, with no spaces.')
+    await check_key(name, k)
+    q('insert or replace into connectors(user_id,name,enc,last4,updated_at) values(?,?,?,?,?)', (u['id'], name, FERNET.encrypt(k.encode()).decode(), k[-4:], now()))
+    return {'ok': True, 'last4': k[-4:]}
+
+@app.delete('/li-auth/connectors/{name}')
+async def drop_connector(name: str, req: Request):
+    u = await who(req); q('delete from connectors where user_id=? and name=?', (u['id'], name)); return {'ok': True}
+
+# ---------- tools: OSINT (li-osint service), legal (free public APIs), connectors (user's keys) ----------
+_heavy = asyncio.Semaphore(2)
+HEAVY = {'username', 'harvest', 'crawl'}
+async def osint_call(path, b, timeout=60):
+    try:
+        r = await http.post(OSINT + path, json=b, timeout=timeout)
+    except Exception:
+        raise HTTPException(502, 'The OSINT tools are not answering right now.')
+    if r.status_code >= 400:
+        try: d = r.json().get('detail')
+        except Exception: d = None
+        raise HTTPException(r.status_code if r.status_code < 500 else 502, d or 'The tool failed.')
+    return r.json()
+
+def need(uid, name):
+    k = key_for(uid, name)
+    if not k: raise HTTPException(412, f'Connect {CONNECTORS[name]["name"]} first: Settings, Connectors, paste your key.')
+    return k
+
+async def legal_cases(qy, kind, uid):
+    k = key_for(uid, 'courtlistener'); h = {'Authorization': 'Token ' + k} if k else {}
+    ver = 'v4' if k else 'v3'  # v4 search needs a token; v3 still answers without one, with lower limits
+    r = await web_http.get(f'https://www.courtlistener.com/api/rest/{ver}/search/', params={'q': qy, 'type': 'o' if kind == 'cases' else 'r', 'order_by': 'score desc'}, headers=h, timeout=30)
+    if r.status_code in (401, 403): raise HTTPException(412, 'CourtListener wants a free API token for this. Settings, Connectors, CourtListener.')
+    if r.status_code >= 400: raise HTTPException(502, f'CourtListener answered {r.status_code}.')
+    res = []
+    for x in r.json().get('results', [])[:12]:
+        if kind == 'cases':
+            snip = x.get('snippet') or ((x.get('opinions') or [{}])[0].get('snippet') or '')
+            res.append({'title': x.get('caseName'), 'court': x.get('court'), 'date': x.get('dateFiled'), 'citation': ', '.join(x.get('citation') or [])[:120],
+                        'url': 'https://www.courtlistener.com' + (x.get('absolute_url') or ''), 'snippet': re.sub(r'<[^>]+>', '', snip)[:300]})
+        else:
+            res.append({'title': x.get('caseName'), 'court': x.get('court'), 'docket': x.get('docketNumber'), 'date': x.get('dateFiled'),
+                        'url': 'https://www.courtlistener.com' + (x.get('docket_absolute_url') or x.get('absolute_url') or ''), 'parties': (x.get('party') or [])[:6]})
+    return {'query': qy, 'results': res, 'sources': ['CourtListener (Free Law Project)' + (' with your token' if k else '')]}
+
+async def run_tool(u, tool, target, b):
+    t = target
+    if tool in ('domain', 'ip', 'wayback', 'username', 'harvest'):
+        return await osint_call('/' + tool, {'target': t}, timeout=190 if tool in HEAVY else 60), f'li-osint/{tool}'
+    if tool in ('cases', 'dockets'):
+        return await legal_cases(t, tool, u['id']), 'CourtListener API v4'
+    if tool == 'fedreg':
+        r = await web_http.get('https://www.federalregister.gov/api/v1/documents.json', params={'conditions[term]': t, 'per_page': 10, 'order': 'relevance'}, timeout=30)
+        return {'query': t, 'results': [{'title': x.get('title'), 'type': x.get('type'), 'date': x.get('publication_date'), 'agencies': [a.get('name') for a in x.get('agencies') or []][:3],
+                'url': x.get('html_url'), 'snippet': (x.get('abstract') or '')[:300]} for x in r.json().get('results', [])], 'sources': ['Federal Register API']}, 'Federal Register API'
+    if tool == 'ecfr':
+        r = await web_http.get('https://www.ecfr.gov/api/search/v1/results', params={'query': t, 'per_page': 10}, timeout=30)
+        res = []
+        for x in r.json().get('results', []):
+            h = x.get('hierarchy') or {}
+            path = f"title-{h.get('title')}/section-{h.get('section')}" if h.get('section') else f"title-{h.get('title')}/part-{h.get('part')}"
+            res.append({'title': ' '.join(str(v) for v in (x.get('hierarchy_headings') or {}).values() if v)[:200] or x.get('headings', {}).get('section'),
+                        'cite': f"{h.get('title')} CFR {h.get('section') or h.get('part')}", 'url': f'https://www.ecfr.gov/current/{path}', 'snippet': re.sub(r'<[^>]+>', '', x.get('full_text_excerpt') or '')[:300]})
+        return {'query': t, 'results': res, 'sources': ['eCFR API']}, 'eCFR API'
+    if tool == 'shodan':
+        k = need(u['id'], 'shodan')
+        try:
+            if not ipaddress.ip_address(t).is_global: raise ValueError
+        except ValueError:
+            raise HTTPException(400, 'Shodan needs a public IP address.')
+        r = await web_http.get(f'https://api.shodan.io/shodan/host/{t}', params={'key': k, 'minify': 'false'}, timeout=30)
+        if r.status_code == 404: return {'ip': t, 'ports': [], 'note': 'Shodan has no record of this IP.'}, 'Shodan API'
+        if r.status_code >= 400: raise HTTPException(502, f'Shodan answered {r.status_code}.')
+        j = r.json()
+        return {'ip': t, 'org': j.get('org'), 'isp': j.get('isp'), 'country': j.get('country_name'), 'hostnames': j.get('hostnames'), 'ports': j.get('ports'),
+                'vulns': list(j.get('vulns') or [])[:30], 'last_update': j.get('last_update'),
+                'services': [{'port': s.get('port'), 'product': s.get('product'), 'version': s.get('version'), 'banner': (s.get('data') or '')[:200]} for s in j.get('data', [])[:20]]}, 'Shodan API'
+    if tool == 'hunter':
+        k = need(u['id'], 'hunter')
+        t = t.lower().replace('https://', '').replace('http://', '').split('/')[0]
+        if not re.match(r'^[a-z0-9.-]+\.[a-z]{2,}$', t): raise HTTPException(400, 'Hunter.io needs a domain like example.com.')
+        r = await web_http.get('https://api.hunter.io/v2/domain-search', params={'domain': t, 'api_key': k, 'limit': 50}, timeout=30)
+        if r.status_code >= 400: raise HTTPException(502, f'Hunter.io answered {r.status_code}.')
+        j = r.json().get('data', {})
+        return {'domain': t, 'organization': j.get('organization'), 'pattern': j.get('pattern'),
+                'emails': [{'value': e.get('value'), 'name': ' '.join(x for x in [e.get('first_name'), e.get('last_name')] if x), 'position': e.get('position'), 'confidence': e.get('confidence'),
+                            'sources': [s.get('uri') for s in e.get('sources', [])[:3]]} for e in j.get('emails', [])]}, 'Hunter.io API'
+    if tool == 'pwned':
+        k = need(u['id'], 'hibp')
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$', t): raise HTTPException(400, 'Have I Been Pwned needs an email address.')
+        r = await web_http.get(f'https://haveibeenpwned.com/api/v3/breachedaccount/{t}', params={'truncateResponse': 'false'}, headers={'hibp-api-key': k, 'user-agent': 'Li-case-tools'}, timeout=30)
+        if r.status_code == 404: return {'email': t, 'breaches': []}, 'Have I Been Pwned API'
+        if r.status_code >= 400: raise HTTPException(502, f'Have I Been Pwned answered {r.status_code}.')
+        return {'email': t, 'breaches': [{'name': x.get('Name'), 'domain': x.get('Domain'), 'date': x.get('BreachDate'), 'data': x.get('DataClasses')} for x in r.json()]}, 'Have I Been Pwned API'
+    if tool in ('scrape', 'fsearch', 'crawl'):
+        k = need(u['id'], 'firecrawl'); H = {'Authorization': 'Bearer ' + k}
+        if tool == 'scrape':
+            public_url(t if t.startswith('http') else 'https://' + t)
+            r = await web_http.post('https://api.firecrawl.dev/v2/scrape', json={'url': t, 'formats': ['markdown'], 'onlyMainContent': True}, headers=H, timeout=90)
+            if r.status_code >= 400: raise HTTPException(502, f'Firecrawl answered {r.status_code}.')
+            d = r.json().get('data', {}); return {'url': t, 'title': (d.get('metadata') or {}).get('title'), 'pages': 1, 'markdown': (d.get('markdown') or '')[:20000]}, 'Firecrawl scrape'
+        if tool == 'fsearch':
+            r = await web_http.post('https://api.firecrawl.dev/v2/search', json={'query': t, 'limit': 6}, headers=H, timeout=60)
+            if r.status_code >= 400: raise HTTPException(502, f'Firecrawl answered {r.status_code}.')
+            d = r.json().get('data', {}); web = d.get('web', d) if isinstance(d, dict) else d
+            return {'query': t, 'results': [{'title': x.get('title'), 'url': x.get('url'), 'snippet': (x.get('description') or '')[:300]} for x in (web or [])][:6]}, 'Firecrawl search'
+        public_url(t if t.startswith('http') else 'https://' + t)
+        r = await web_http.post('https://api.firecrawl.dev/v2/crawl', json={'url': t, 'limit': 10, 'scrapeOptions': {'formats': ['markdown'], 'onlyMainContent': True}}, headers=H, timeout=60)
+        if r.status_code >= 400: raise HTTPException(502, f'Firecrawl answered {r.status_code}.')
+        jid = r.json().get('id')
+        for _ in range(40):
+            await asyncio.sleep(4)
+            s = (await web_http.get(f'https://api.firecrawl.dev/v2/crawl/{jid}', headers=H, timeout=30)).json()
+            if s.get('status') in ('completed', 'failed', 'cancelled'): break
+        pages = [{'url': (p.get('metadata') or {}).get('sourceURL'), 'title': (p.get('metadata') or {}).get('title'), 'markdown': (p.get('markdown') or '')[:3000]} for p in s.get('data', [])[:10]]
+        return {'url': t, 'status': s.get('status'), 'pages': len(pages), 'items': pages}, 'Firecrawl crawl'
+    raise HTTPException(404, 'Unknown tool.')
+
+TOOLS = {'domain', 'ip', 'wayback', 'username', 'harvest', 'cases', 'dockets', 'fedreg', 'ecfr', 'shodan', 'hunter', 'pwned', 'scrape', 'fsearch', 'crawl'}
+@app.post('/li-auth/tool/{tool}')
+async def tool(tool: str, req: Request):
+    u = await who(req)
+    if tool not in TOOLS: raise HTTPException(404, 'Unknown tool.')
+    limit(req, 'tool' + u['id'], 40, 600)
+    b = await req.json(); target = str(b.get('target') or '').strip()[:500]
+    if not target: raise HTTPException(400, 'Give the tool something to look up.')
+    if tool in HEAVY:
+        limit(req, 'heavy' + u['id'], 8, 600)
+        async with _heavy:
+            data, source = await run_tool(u, tool, target, b)
+    else:
+        data, source = await asyncio.wait_for(run_tool(u, tool, target, b), 120)
+    ev = save_evidence(u, case_of(b), tool, target, data, source)
+    return {'tool': tool, 'target': target, 'evidence': ev, 'data': data}
+
+@app.post('/li-auth/tool-exif')
+async def tool_exif(req: Request):
+    u = await who(req); limit(req, 'tool' + u['id'], 40, 600)
+    body = await req.body()
+    if not body or len(body) > 30_000_000: raise HTTPException(400, 'Send one photo up to 30 MB.')
+    fsha = hashlib.sha256(body).hexdigest()
+    try:
+        r = await http.post(OSINT + '/exif', content=body, timeout=40)
+    except Exception:
+        raise HTTPException(502, 'The OSINT tools are not answering right now.')
+    if r.status_code >= 400: raise HTTPException(502, 'Could not read that photo.')
+    data = r.json(); name = req.headers.get('x-file-name', 'photo')[:120]
+    case = (req.headers.get('x-case') or 'General')[:80]
+    ev = save_evidence(u, case, 'exif', name, data, 'exiftool', file_sha=fsha)
+    return {'tool': 'exif', 'target': name, 'evidence': ev, 'data': data}
+
+def _like(s): return '%' + s.replace('%', '').replace('_', '') + '%'
+@app.get('/li-auth/case/{case}/evidence')
+async def case_evidence(case: str, req: Request, q_: str = '', tag: str = ''):
+    u = await who(req); qs = req.query_params.get('q', '')
+    sql, args = 'select id,kind,target,summary,sha256,file_sha256,source,tags,created_at from evidence where user_id=? and case_name=?', [u['id'], case]
+    if qs: sql += ' and (target like ? or summary like ? or tags like ? or data like ?)'; args += [_like(qs)] * 4
+    return [dict(r) for r in q(sql + ' order by created_at desc limit 300', args)]
+
+@app.get('/li-auth/evidence/{eid}')
+async def evidence_one(eid: int, req: Request):
+    u = await who(req); r = q('select * from evidence where id=? and user_id=?', (eid, u['id']), one=True)
+    if not r: raise HTTPException(404, 'Not found.')
+    d = dict(r); d['verified'] = hashlib.sha256(d['data'].encode()).hexdigest() == d['sha256']; d['data'] = json.loads(d['data']); return d
+
+@app.get('/li-auth/case/{case}/entities')
+async def case_entities(case: str, req: Request):
+    u = await who(req); qs = req.query_params.get('q', '')
+    sql, args = 'select * from entities where user_id=? and case_name=?', [u['id'], case]
+    if qs: sql += ' and (value like ? or note like ? or tags like ? or etype like ?)'; args += [_like(qs)] * 4
+    return [dict(r) for r in q(sql + ' order by etype, last_seen desc limit 600', args)]
+
+@app.get('/li-auth/case/{case}/timeline')
+async def case_timeline(case: str, req: Request):
+    u = await who(req)
+    ev = [{'at': r['created_at'], 'what': f"{r['kind']}: {r['target']}", 'detail': r['summary'], 'ref': f"E{r['id']}", 'tags': r['tags']} for r in q('select * from evidence where user_id=? and case_name=?', (u['id'], case))]
+    nt = [{'at': r['at'], 'what': 'Note', 'detail': r['text'], 'ref': f"N{r['id']}", 'tags': ''} for r in q('select * from notes where user_id=? and case_name=?', (u['id'], case))]
+    return sorted(ev + nt, key=lambda x: x['at'], reverse=True)[:500]
+
+@app.post('/li-auth/case/{case}/note')
+async def case_note(case: str, req: Request):
+    u = await who(req); b = await req.json(); txt = str(b.get('text') or '').strip()[:2000]
+    if not txt: raise HTTPException(400, 'Write something.')
+    at = int(b.get('at') or now())
+    q('insert into notes(user_id,case_name,text,at,created_at) values(?,?,?,?,?)', (u['id'], case[:80], txt, at, now())); return {'ok': True}
+
+@app.post('/li-auth/tag/{kind}/{iid}')
+async def set_tags(kind: str, iid: int, req: Request):
+    u = await who(req); b = await req.json()
+    tags = ','.join(sorted({t.strip().lower()[:30] for t in str(b.get('tags') or '').split(',') if t.strip()}))[:300]
+    if kind == 'evidence': q('update evidence set tags=? where id=? and user_id=?', (tags, iid, u['id']))
+    elif kind == 'entity':
+        q('update entities set tags=? where id=? and user_id=?', (tags, iid, u['id']))
+        if 'note' in b: q('update entities set note=? where id=? and user_id=?', (str(b['note'])[:1000], iid, u['id']))
+    else: raise HTTPException(404, 'Unknown.')
+    return {'ok': True, 'tags': tags}
 
 # ---------- voice ----------
 @app.post('/li-auth/tts')
